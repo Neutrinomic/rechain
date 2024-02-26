@@ -1,0 +1,10 @@
+[package]
+name = "rechain"
+version = "1.0.0"
+description = "Blockchain maker"
+repository = ""
+keywords = [ ]
+license = "MIT"
+
+[dependencies]
+swb = "https://github.com/infu/swb"
