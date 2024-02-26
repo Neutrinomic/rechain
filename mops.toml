@@ -1,10 +1,10 @@
 [package]
 name = "rechain"
 version = "0.1.0"
-description = "Blockchain maker"
+description = "Blockchain middleware"
 repository = "https://github.com/Neutrinomic/rechain"
 keywords = [ ]
 license = "MIT"
 
 [dependencies]
-swb = "https://github.com/infu/swb"
+swb = "https://github.com/infu/swb#master@a485ba105a11eeb1754cb074c5d059c8202102f4"
