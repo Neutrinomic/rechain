@@ -2,7 +2,7 @@
 name = "rechain"
 version = "1.0.0"
 description = "Blockchain maker"
-repository = ""
+repository = "https://github.com/Neutrinomic/rechain"
 keywords = [ ]
 license = "MIT"
 
