@@ -6,8 +6,5 @@ mops add rechain
 ```
 
 ## Usage
-```motoko
-import Rechain "mo:rechain";
-
-// example...
-```# rechain
+https://github.com/Neutrinomic/rechain_example
+https://github.com/Neutrinomic/minimalistic_ledger
