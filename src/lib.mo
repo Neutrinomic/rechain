@@ -45,6 +45,7 @@ module {
 
     public type ReducerResponse<E> = {
         #Ok: (BlockId) -> ();
+        #Pass;
         #Err : E
     };
 
