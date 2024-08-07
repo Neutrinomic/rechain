@@ -1,0 +1,67 @@
+// {
+//     "compilerOptions": {
+//         // compilation
+//         "module": "NodeNext",
+//         "target": "ESNext",
+//         "lib": [
+//             "ESNext"
+//         ],
+//         // resolution
+//         "moduleResolution": "NodeNext",
+//         "moduleDetection": "force",
+//         // type checking
+//         "strict": true,
+//         "allowJs": true,
+//         "downlevelIteration": true,
+//         "skipLibCheck": true,
+//         "allowSyntheticDefaultImports": true,
+//         "forceConsistentCasingInFileNames": true,
+//         "noImplicitAny": true,
+//         "noUnusedLocals": false,
+//         "noUnusedParameters": true,
+//         "noFallthroughCasesInSwitch": true,
+//         "types": [
+//             "jest",
+//             "node"
+//         ]
+//     },
+//     "include": ["**/*.spec.ts"]
+// }
+
+{
+    "compilerOptions": {
+      // enable latest features
+      "lib": ["ESNext"],
+      "target": "ESNext",
+      "module": "ESNext",
+      "moduleDetection": "force",
+      "allowJs": true, // allow importing `.js` from `.ts`
+      "types": ["jest", "node"],
+  
+      "esModuleInterop": true,
+
+      // Bundler mode
+      "moduleResolution": "bundler",
+      "allowImportingTsExtensions": true,
+      "verbatimModuleSyntax": false,
+      "noEmit": true,
+
+      // Best practices
+      "strict": true,
+      "skipLibCheck": true,
+      "noUnusedLocals": false,
+      "noUnusedParameters": false,
+      "noFallthroughCasesInSwitch": true,
+  
+      // Some stricter flags
+      "useUnknownInCatchVariables": true,
+      "noPropertyAccessFromIndexSignature": true
+    },
+    "include": [
+      "**/*.spec.ts", //ILDE
+      "./src/**/*.ts",
+      "./global-setup.ts",
+      "./global-teardown.ts",
+      "./types.d.ts"
+    ]
+  }

@@ -1,0 +1,5 @@
+.mops
+node_modules
+build
+test/build/
+src/declarations

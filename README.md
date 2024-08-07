@@ -12,36 +12,33 @@ Modularity and Extensibility: Designed with modularity at its core, the library 
 
 Reducer Libraries: Developers can publish their reducers as libraries, enabling others to incorporate these libraries into their canisters for efficient remote state synchronization. This process involves tracking a remote ledger's transaction log and reconstructing the required state segments in their canisters. This mechanism facilitates the development of dApps that can in certain cases can do remotely atomic synchronous operations within asynchronous environments, similar to the DeVeFi Ledger Middleware's capabilities.
 
-**Example 1 - Simple**
+**Example - ICRC3 compliant ledger**
 
 https://github.com/Neutrinomic/rechain_example
 
-The provided example illustrates the use of the library in a token transfer system. It showcases the definition of actions for token transfers and minting, error handling mechanisms, and the implementation of reducer functions to manage the application's state. 
+The provided example illustrates the use of the library to implement the ICRC3 ledger standard. It is based on the the ICDev/PanIndustrial implementation (https://github.com/PanIndustrial-Org/icrc3.mo/) but with some variations:
+* The ledger is implemented with a stable sliding window buffer (https://mops.one/swbstablea) instead of a more regular vector making archiving and query operations much simpler
+* It demonstrate the use of the rechain library adding 2 reducers that are applied to every single incoming block: 1) to continuously update the balance of every ledger account, 2) to check the consistency of the block creation time and the possible existence of a duplicated block
+* In the ICDev/PanIndustrial implementation, if ledger exceeded its max length, it was setting a timer to run in the next round to run the archive. We instead run a recurrent timer that checks every 30 seconds whether we need to create an archive.
+* (under development) Recurrent timer (every 6 hours) that checks all archive canister cycle balances and refills them with X amount of cycles if they dropped bellow Y unless the main canister is bellow Z (X,Y,Z are settings)
 
-**Example 2 - Advanced - Ledger with ICRC1, ICRC3, ICRC4**
-https://github.com/Neutrinomic/minimalistic_ledger
+----> document parameter semantic
+----> example of how to create a ledger (including setting the canister princiapla... Motoko team working on how to avoid it)
+----> how dispatching works
+----> what happens when errors (types of errors)
+----> explain canister upgrading
+----> explain (todo) cycling refilling (explain we only refil the main canister and the archives are auto refilled, with the recurrent timer: 6h)
 
-
-**Middleware (Alpha | POC | Untested):**
-https://mops.one/rechain
-https://github.com/Neutrinomic/rechain
-
-**TODO:**
-- Compliance with ICRC3
-- Certification
-- Creating & communicating with archive canisters
-
-**ICRC-3 problems**
-- (not using) Generic Values are hard to use and probably prone to errors. Our reducers will have to reduce Generic Values if we want to replay state. Motoko CDK could add support for these that won't result in bloated code at some point in the future. These also need a schema. Sounds like what Candid is supposed to do  https://forum.dfinity.org/t/icrc-3-draft-v2-and-next-steps/25132/3
-- (currently using) Hashing Candid binary format has other problems, but these can be fixed by making Candid produce the same binary on different platforms or ignored if we restrict hash verification only to Motoko canisters https://forum.dfinity.org/t/icrc-3-draft-v2-and-next-steps/25132/6 
 
 
 ## Install
+(TODO)
 ```
-mops add rechain
+nvm 21.4
+go to test
+yarn
+built
 ```
 
-## Usage
-
-
-
+## Usage/testing
+(TODO)

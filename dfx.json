@@ -1,0 +1,11 @@
+{
+  "canisters": {},
+
+  "defaults": {
+    "build": {
+      "packtool": "mops sources"
+    }
+  },
+  "dfx": "0.21.0"
+
+}

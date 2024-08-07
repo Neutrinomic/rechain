@@ -1,10 +1,18 @@
 [package]
 name = "rechain"
-version = "0.1.2"
-description = "Blockchain middleware"
-repository = "https://github.com/Neutrinomic/rechain"
-keywords = [ ]
-license = "MIT"
+version = "1.0.0"
+description = "Rechain"
+repository = "https://github.com/neutrinomic/rechain"
+keywords = [ "history", "events", "icrc3", "archive" ]
+license = "Apache-2.0"
 
 [dependencies]
-swb = "https://github.com/infu/swb#master@a485ba105a11eeb1754cb074c5d059c8202102f4"
+base = "0.11.3"
+map = "9.0.1"
+sha2 = "0.0.4"
+vector = "0.3.1"
+rep-indy-hash = "0.1.1"
+stable-write-only = "https://github.com/skilesare/StableWriteOnly.mo#v0.1.0@02e9aac74bdbed86b52ebed985d82b6ef66a76d8"
+swbstable = "1.1.1"
+itertools = "0.2.1"
+ic-certification = "0.1.3"
