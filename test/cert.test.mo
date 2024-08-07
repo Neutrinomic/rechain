@@ -24,7 +24,7 @@ import ExperimentalCycles "mo:base/ExperimentalCycles";
 import Iter "mo:base/Iter";
 import Text "mo:base/Text";
 
-import SysLog "../src/SysLog";
+import SysLog "../src/syslog";
 //import SWB "mo:swbstable/Stable";
 
 actor Self {
