@@ -23,156 +23,172 @@ import ExperimentalCycles "mo:base/ExperimentalCycles";
 import Iter "mo:base/Iter";
 import Text "mo:base/Text";
 
+//ILDE reader NEW
+import reader "../src/reader";
+
 actor Self {
 
     // -- Ledger configuration
-    let config : T.Config = {
-        var TX_WINDOW  = 86400_000_000_000;  // 24 hours in nanoseconds
-        var PERMITTED_DRIFT = 60_000_000_000;
-        var FEE = 0;//1_000; ILDE: I make it 0 to simplify testing
-        var MINTING_ACCOUNT = {
-            owner = Principal.fromText("aaaaa-aa");
-            subaccount = null;
-            }
-    };
 
-    // -- Reducer : Balances
-    stable let balances_mem = Balances.Mem();
-    let balances = Balances.Balances({
-        config;
-        mem = balances_mem;
-    });
+    // let config : T.Config = {
+    //     var TX_WINDOW  = 86400_000_000_000;  // 24 hours in nanoseconds
+    //     var PERMITTED_DRIFT = 60_000_000_000;
+    //     var FEE = 0;//1_000; ILDE: I make it 0 to simplify testing
+    //     var MINTING_ACCOUNT = {
+    //         owner = Principal.fromText("aaaaa-aa");
+    //         subaccount = null;
+    //         }
+    // };
 
-    // -- Reducer : Deduplication
+    // // -- Reducer : Balances
+    // stable let balances_mem = Balances.Mem();
+    // let balances = Balances.Balances({
+    //     config;
+    //     mem = balances_mem;
+    // });
 
-    stable let dedup_mem = Deduplication.Mem();
-    let dedup = Deduplication.Deduplication({
-        config;
-        mem = dedup_mem;
-    });
+    // // -- Reducer : Deduplication
+
+    // stable let dedup_mem = Deduplication.Mem();
+    // let dedup = Deduplication.Deduplication({
+    //     config;
+    //     mem = dedup_mem;
+    // });
 
     // -- Chain
 
-    stable let chain_mem = rechain.Mem();
+    //stable let chain_mem = rechain.Mem();
+
+    stable let reader_mem = reader.Mem();
 
 
-    func encodeBlock(b: T.Action) : [rechain.ValueMap] {
+    // func encodeBlock(b: T.Action) : [rechain.ValueMap] {
 
-        let created_at_time: Nat64 = switch (b.created_at_time) {
-            case null 0;
-            case (?Nat) Nat;
-        };
-        let memo: Blob = switch (b.memo) {
-            case null "0" : Blob;
-            case (?Blob) Blob;
-        };
-        let fee: Nat = switch (b.fee) {
-            case null 0;
-            case (?Nat) Nat;
-        };
-        [
-            ("ts", #Nat(Nat64.toNat(b.ts))),
+    //     let created_at_time: Nat64 = switch (b.created_at_time) {
+    //         case null 0;
+    //         case (?Nat) Nat;
+    //     };
+    //     let memo: Blob = switch (b.memo) {
+    //         case null "0" : Blob;
+    //         case (?Blob) Blob;
+    //     };
+    //     let fee: Nat = switch (b.fee) {
+    //         case null 0;
+    //         case (?Nat) Nat;
+    //     };
+    //     [
+    //         ("ts", #Nat(Nat64.toNat(b.ts))),
 
-            ("btype", #Text(switch (b.payload) {
-                    case (#burn(_)) "1burn";
-                    case (#transfer(_)) "1xfer";
-                    case (#mint(_)) "1mint";
-                    case (#transfer_from(_)) "2xfer";
-                })),
-            ("tx", #Map([
-                ("created_at_time", #Nat(Nat64.toNat(created_at_time))),
-                ("memo", #Blob(memo)),
-                ("caller", #Blob(Principal.toBlob(b.caller))),
-                ("fee", #Nat(fee)),
-                ("payload", #Map(switch (b.payload) {
-                    case (#burn(data)) {
-                        let inner_trx = Vec.new<(Text, rechain.Value)>();
-                        let amt: Nat = data.amt;
-                        Vec.add(inner_trx, ("amt", #Nat(amt)));
-                        let trx_from = Vec.new<rechain.Value>();
-                        for(thisItem in data.from.vals()){
-                            Vec.add(trx_from,#Blob(thisItem));
-                        };
-                        let trx_from_array = Vec.toArray(trx_from);
-                        Vec.add(inner_trx, ("from", #Array(trx_from_array)));  
-                        let inner_trx_array = Vec.toArray(inner_trx); 
-                        inner_trx_array;        
-                    };
-                    case (#transfer(data)) {
-                        let inner_trx = Vec.new<(Text, rechain.Value)>();
-                        let amt: Nat = data.amt;
-                        Vec.add(inner_trx, ("amt", #Nat(amt)));
-                        let trx_from = Vec.new<rechain.Value>();
-                        for(thisItem in data.from.vals()){
-                            Vec.add(trx_from,#Blob(thisItem));
-                        };
-                        let trx_from_array = Vec.toArray(trx_from);
-                        Vec.add(inner_trx, ("from", #Array(trx_from_array)));  
-                        let trx_to = Vec.new<rechain.Value>();
-                        for(thisItem in data.to.vals()){
-                            Vec.add(trx_to,#Blob(thisItem));
-                        };
-                        let trx_to_array = Vec.toArray(trx_to);
-                        Vec.add(inner_trx, ("to", #Array(trx_to_array))); 
-                        let inner_trx_array = Vec.toArray(inner_trx);
-                        inner_trx_array;
-                    };
-                    case (#mint(data)) {
-                        let inner_trx = Vec.new<(Text, rechain.Value)>();
-                        let amt: Nat = data.amt;
-                        Vec.add(inner_trx, ("amt", #Nat(amt)));
-                        let trx_to = Vec.new<rechain.Value>();
-                        for(thisItem in data.to.vals()){
-                            Vec.add(trx_to,#Blob(thisItem));
-                        };
-                        let trx_to_array = Vec.toArray(trx_to);
-                        Vec.add(inner_trx, ("to", #Array(trx_to_array)));  
-                        let inner_trx_array = Vec.toArray(inner_trx);
-                        inner_trx_array; 
-                    };
-                    case (#transfer_from(data)) {
-                        let inner_trx = Vec.new<(Text, rechain.Value)>();
-                        let amt: Nat = data.amt;
-                        Vec.add(inner_trx, ("amt", #Nat(amt)));
-                        let trx_from = Vec.new<rechain.Value>();
-                        for(thisItem in data.from.vals()){
-                            Vec.add(trx_from,#Blob(thisItem));
-                        };
-                        let trx_from_array = Vec.toArray(trx_from);
-                        Vec.add(inner_trx, ("from", #Array(trx_from_array)));  
-                        let trx_to = Vec.new<rechain.Value>();
-                        for(thisItem in data.to.vals()){
-                            Vec.add(trx_to,#Blob(thisItem));
-                        };
-                        let trx_to_array = Vec.toArray(trx_to);
-                        Vec.add(inner_trx, ("to", #Array(trx_to_array))); 
-                        let inner_trx_array = Vec.toArray(inner_trx);
-                        inner_trx_array; 
-                    };
-                },))
-            ])),
-        ];
-    };
+    //         ("btype", #Text(switch (b.payload) {
+    //                 case (#burn(_)) "1burn";
+    //                 case (#transfer(_)) "1xfer";
+    //                 case (#mint(_)) "1mint";
+    //                 case (#transfer_from(_)) "2xfer";
+    //             })),
+    //         ("tx", #Map([
+    //             ("created_at_time", #Nat(Nat64.toNat(created_at_time))),
+    //             ("memo", #Blob(memo)),
+    //             ("caller", #Blob(Principal.toBlob(b.caller))),
+    //             ("fee", #Nat(fee)),
+    //             ("payload", #Map(switch (b.payload) {
+    //                 case (#burn(data)) {
+    //                     let inner_trx = Vec.new<(Text, rechain.Value)>();
+    //                     let amt: Nat = data.amt;
+    //                     Vec.add(inner_trx, ("amt", #Nat(amt)));
+    //                     let trx_from = Vec.new<rechain.Value>();
+    //                     for(thisItem in data.from.vals()){
+    //                         Vec.add(trx_from,#Blob(thisItem));
+    //                     };
+    //                     let trx_from_array = Vec.toArray(trx_from);
+    //                     Vec.add(inner_trx, ("from", #Array(trx_from_array)));  
+    //                     let inner_trx_array = Vec.toArray(inner_trx); 
+    //                     inner_trx_array;        
+    //                 };
+    //                 case (#transfer(data)) {
+    //                     let inner_trx = Vec.new<(Text, rechain.Value)>();
+    //                     let amt: Nat = data.amt;
+    //                     Vec.add(inner_trx, ("amt", #Nat(amt)));
+    //                     let trx_from = Vec.new<rechain.Value>();
+    //                     for(thisItem in data.from.vals()){
+    //                         Vec.add(trx_from,#Blob(thisItem));
+    //                     };
+    //                     let trx_from_array = Vec.toArray(trx_from);
+    //                     Vec.add(inner_trx, ("from", #Array(trx_from_array)));  
+    //                     let trx_to = Vec.new<rechain.Value>();
+    //                     for(thisItem in data.to.vals()){
+    //                         Vec.add(trx_to,#Blob(thisItem));
+    //                     };
+    //                     let trx_to_array = Vec.toArray(trx_to);
+    //                     Vec.add(inner_trx, ("to", #Array(trx_to_array))); 
+    //                     let inner_trx_array = Vec.toArray(inner_trx);
+    //                     inner_trx_array;
+    //                 };
+    //                 case (#mint(data)) {
+    //                     let inner_trx = Vec.new<(Text, rechain.Value)>();
+    //                     let amt: Nat = data.amt;
+    //                     Vec.add(inner_trx, ("amt", #Nat(amt)));
+    //                     let trx_to = Vec.new<rechain.Value>();
+    //                     for(thisItem in data.to.vals()){
+    //                         Vec.add(trx_to,#Blob(thisItem));
+    //                     };
+    //                     let trx_to_array = Vec.toArray(trx_to);
+    //                     Vec.add(inner_trx, ("to", #Array(trx_to_array)));  
+    //                     let inner_trx_array = Vec.toArray(inner_trx);
+    //                     inner_trx_array; 
+    //                 };
+    //                 case (#transfer_from(data)) {
+    //                     let inner_trx = Vec.new<(Text, rechain.Value)>();
+    //                     let amt: Nat = data.amt;
+    //                     Vec.add(inner_trx, ("amt", #Nat(amt)));
+    //                     let trx_from = Vec.new<rechain.Value>();
+    //                     for(thisItem in data.from.vals()){
+    //                         Vec.add(trx_from,#Blob(thisItem));
+    //                     };
+    //                     let trx_from_array = Vec.toArray(trx_from);
+    //                     Vec.add(inner_trx, ("from", #Array(trx_from_array)));  
+    //                     let trx_to = Vec.new<rechain.Value>();
+    //                     for(thisItem in data.to.vals()){
+    //                         Vec.add(trx_to,#Blob(thisItem));
+    //                     };
+    //                     let trx_to_array = Vec.toArray(trx_to);
+    //                     Vec.add(inner_trx, ("to", #Array(trx_to_array))); 
+    //                     let inner_trx_array = Vec.toArray(inner_trx);
+    //                     inner_trx_array; 
+    //                 };
+    //             },))
+    //         ])),
+    //     ];
+    // };
 
-    public query func compute_hash(auxm1: rechain.Value) : async ?Blob {
-        let ret = ?Blob.fromArray(RepIndy.hash_val(auxm1));
-        return ret;
-    };
+    // public query func compute_hash(auxm1: rechain.Value) : async ?Blob {
+    //     let ret = ?Blob.fromArray(RepIndy.hash_val(auxm1));
+    //     return ret;
+    // };
 
-    public query func icrc3_get_blocks(args: rechain.GetBlocksArgs) : async rechain.GetBlocksResult{
-        return chain.get_blocks(args);
-    };
+    // public query func icrc3_get_blocks(args: rechain.GetBlocksArgs) : async rechain.GetBlocksResult{
+    //     return chain.get_blocks(args);
+    // };
 
-    public query func icrc3_get_archives(args: rechain.GetArchivesArgs) : async rechain.GetArchivesResult{
-        return chain.get_archives(args);
-    };
+    // public query func icrc3_get_archives(args: rechain.GetArchivesArgs) : async rechain.GetArchivesResult{
+    //     return chain.get_archives(args);
+    // };
 
-    var chain = rechain.Chain<T.Action, T.ActionError>({ 
-        settings = ?{rechain.DEFAULT_SETTINGS with supportedBlocks = []; maxActiveRecords = 20; settleToRecords = 10; maxRecordsInArchiveInstance = 30;};
-        mem = chain_mem;
-        encodeBlock = encodeBlock;
-        reducers = [balances.reducer];//, dedup.reducer];//, balancesIlde.reducer];  
-    });
+    // var chain = rechain.Chain<T.Action, T.ActionError>({ 
+    //     settings = ?{rechain.DEFAULT_SETTINGS with supportedBlocks = [];};// maxActiveRecords = 20; settleToRecords = 10; maxRecordsInArchiveInstance = 30;};
+    //     mem = chain_mem;
+    //     encodeBlock = encodeBlock;
+    //     reducers = [balances.reducer];//, dedup.reducer];//, balancesIlde.reducer];  
+    // });
+
+    var my_reader = reader.Reader<T.Action>({
+        mem : reader.Mem;
+        ledger_id : Principal;   // IMHERE: how do I pass the ledger principal from ts 
+        start_from_block: {#id:Nat; #last};
+        onError : (Text) -> (); // If error occurs during following and processing it will return the error
+        onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
+        onRead : [T.Action] -> ();
+        decodeBlock : (Block) -> T.Action;
+    }) //<----IMHERE
 
     public shared(msg) func check_archives_balance(): async () {
         return await chain.check_archives_balance();

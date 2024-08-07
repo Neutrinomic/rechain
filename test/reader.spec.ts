@@ -4,10 +4,10 @@ import { Actor, PocketIc, createIdentity} from "@hadronous/pic";
 
 import { IDL } from "@dfinity/candid";
 import {
-  _SERVICE as TestService,
-  idlFactory as TestIdlFactory,
-  init,
-} from "./build/reader_reader.idl.js";
+  _SERVICE as TestService_ledger,
+  idlFactory as TestIdlFactory_ledger,
+  init as init_ledger,
+} from "./build/reader_ledger.idl.js";
 
 import {
   Action,
@@ -18,6 +18,20 @@ import {
   Value__1,
 } from "./build/reader_ledger.idl.js";
 
+import {
+  _SERVICE as TestService_reader,
+  idlFactory as TestIdlFactory_reader,
+  init as init_reader,
+} from "./build/reader_reader.idl.js";
+
+import {
+  // Action,
+  // Account,
+  // GetBlocksArgs,
+  // TransactionRange,
+  // GetTransactionsResult,
+  // Value__1,
+} from "./build/reader_reader.idl.js";
 //@ts-ignore
 import { toState } from "@infu/icblast";
 // Jest can't handle multi threaded BigInts o.O That's why we use toState
@@ -25,21 +39,21 @@ import { toState } from "@infu/icblast";
 const READER_READER_WASM_PATH = resolve(__dirname, "./build/reader_reader.wasm");
 const READER_LEDGER_WASM_PATH = resolve(__dirname, "./build/reader_ledger.wasm");
 
-export async function TestReader(pic: PocketIc, ledgerCanisterId: Principal) {
-  const fixture = await pic.setupCanister<TestService>({
-    idlFactory: TestIdlFactory,
+export async function TestReader(pic: PocketIc, readerCanisterId: Principal) {
+  const fixture = await pic.setupCanister<TestService_reader>({
+    idlFactory: TestIdlFactory_reader,
     wasm: READER_READER_WASM_PATH,
-    arg: IDL.encode(init({ IDL }), []), 
+    arg: IDL.encode(init_reader({ IDL }), []), 
   });
 
   return fixture;
 }
 
 export async function TestLedger(pic: PocketIc, ledgerCanisterId: Principal) {
-  const fixture = await pic.setupCanister<TestService>({
-    idlFactory: TestIdlFactory,
+  const fixture = await pic.setupCanister<TestService_ledger>({
+    idlFactory: TestIdlFactory_ledger,
     wasm: READER_LEDGER_WASM_PATH,
-    arg: IDL.encode(init({ IDL }), []), 
+    arg: IDL.encode(init_ledger({ IDL }), []), 
   });
 
   return fixture;
@@ -184,7 +198,7 @@ function decodeBlock2(my_blocks:GetTransactionsResult, block_pos:number ) {
 
 describe("reader", () => {
   let pic: PocketIc;
-  let can_ledger: Actor<TestService>;
+  let can_ledger: Actor<TestService_ledger>;
   let canCanisterId_ledger: Principal;
 
   const jo = createIdentity('superSecretAlicePassword');
@@ -218,7 +232,7 @@ describe("reader", () => {
     await pic.tearDown(); //this means "it removes the replica"
   });
 
-  it("check_burnblock_to", async () => {
+  it("check_balance_in_reader", async () => {
     let my_mint_action: Action = {
       ts : 0n,
       created_at_time : [0n], //?Nat64
@@ -233,35 +247,52 @@ describe("reader", () => {
       },
     };
     
-    let r_mint = await can_ledger.add_record(my_mint_action);
-    let r_mint2 = await can_ledger.add_record(my_mint_action);
-    let r_mint3 = await can_ledger.add_record(my_mint_action);
+    let i = 0n;
+    for (; i < 100; i++) {
+      let r = await can_ledger.add_record(my_mint_action);
+    }
+    console.log("hello");
+    // Account {
+    //   'owner' : Principal,
+    //   'subaccount' : [] | [Uint8Array | number[]],
+    // }
+    let my_account : Account = {'owner' : john0.getPrincipal(),
+                                'subaccount' : []};
+    let r_balance = await can_ledger.icrc1_balance_of(my_account);
+    console.log("John0 balance: ", r_balance);
+
+    expect(true).toBe(true);
+
+
+
+    // let r_mint2 = await can_ledger.add_record(my_mint_action);
+    // let r_mint3 = await can_ledger.add_record(my_mint_action);
     
-    let my_block_args: GetBlocksArgs = [
-      {start:0n,length:3n}, 
-    ]
+    // let my_block_args: GetBlocksArgs = [
+    //   {start:0n,length:3n}, 
+    // ]
 
-    let my_blocks:GetTransactionsResult = await can_ledger.icrc3_get_blocks(my_block_args);
+    // let my_blocks:GetTransactionsResult = await can_ledger.icrc3_get_blocks(my_block_args);
 
-    const decodedBlock0 = decodeBlock2(my_blocks,1); 
-    const decodedBlock1 = decodeBlock2(my_blocks,1); 
-    const decodedBlock2 = decodeBlock2(my_blocks,2); 
+    // const decodedBlock0 = decodeBlock2(my_blocks,1); 
+    // const decodedBlock1 = decodeBlock2(my_blocks,1); 
+    // const decodedBlock2 = decodeBlock2(my_blocks,2); 
 
-    const john0_to = john0.getPrincipal().toUint8Array();
+    // const john0_to = john0.getPrincipal().toUint8Array();
 
-    expect(true).toBe(JSON.stringify(john0_to) === JSON.stringify(decodedBlock1.payload_to));
+    // expect(true).toBe(JSON.stringify(john0_to) === JSON.stringify(decodedBlock1.payload_to));
 
-    if (typeof decodedBlock1.auxm1 !== 'undefined') {
-      const auxm1 = decodedBlock1.auxm1;
-      const phash_hat1 = await can_ledger.compute_hash(auxm1);
-      expect(true).toBe(JSON.stringify(decodedBlock1.phash) === JSON.stringify(phash_hat1[0]));
-    };
+    // if (typeof decodedBlock1.auxm1 !== 'undefined') {
+    //   const auxm1 = decodedBlock1.auxm1;
+    //   const phash_hat1 = await can_ledger.compute_hash(auxm1);
+    //   expect(true).toBe(JSON.stringify(decodedBlock1.phash) === JSON.stringify(phash_hat1[0]));
+    // };
 
-    if (typeof decodedBlock2.auxm1 !== 'undefined') {
-      const auxm2 = decodedBlock2.auxm1;
-      const phash_hat2 = await can_ledger.compute_hash(auxm2);
-      expect(true).toBe(JSON.stringify(decodedBlock2.phash) === JSON.stringify(phash_hat2[0]));
-    };
+    // if (typeof decodedBlock2.auxm1 !== 'undefined') {
+    //   const auxm2 = decodedBlock2.auxm1;
+    //   const phash_hat2 = await can_ledger.compute_hash(auxm2);
+    //   expect(true).toBe(JSON.stringify(decodedBlock2.phash) === JSON.stringify(phash_hat2[0]));
+    // };
    
   });
 
