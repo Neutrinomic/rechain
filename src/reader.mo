@@ -1,4 +1,4 @@
-import Ledger "./icrc_ledger";
+//import Ledger "./icrc_ledger";
 import Principal "mo:base/Principal";
 import Error "mo:base/Error";
 import Timer "mo:base/Timer";
@@ -12,9 +12,11 @@ import Nat64 "mo:base/Nat64";
 import Time "mo:base/Time";
 import Int "mo:base/Int";
 
+import T "./types";
+
 // From https://github.com/Neutrinomic/devefi_icrc_ledger/tree/master
 module {
-    public type Block = ICRC3.Value;
+    public type Block = T.Value;
 
     public type Mem = {
             var last_indexed_tx : Nat;
@@ -22,7 +24,7 @@ module {
 
     type BlocksUnordered = {
             start : Nat;
-            transactions : [ICRC3.Value];
+            transactions : [T.Value];
         };
         
     public func Mem() : Mem {
@@ -45,7 +47,7 @@ module {
         decodeBlock : (Block) -> A;
     }) {
         var started = false;
-        let ledger = actor (Principal.toText(ledger_id)) : Ledger.Self;
+        let ledger = actor (Principal.toText(ledger_id)) : T.ICRC3Interface;//Ledger.Self;//<<<----IMHERE I need the interface
         var lastTxTime : Nat64 = 0;
 
         private func cycle() : async () {

@@ -23,7 +23,7 @@ import ExperimentalCycles "mo:base/ExperimentalCycles";
 import Iter "mo:base/Iter";
 import Text "mo:base/Text";
 
-actor Self {
+actor Self {//KeyValue(phonebook : Nat){
 
     // -- Ledger configuration
     let config : T.Config = {
@@ -188,7 +188,7 @@ actor Self {
 
     public shared(msg) func set_ledger_canister(): async () {
         chain_mem.canister := ?Principal.fromActor(Self);
-        //chain.set_ledger_canister(Principal.fromActor(Self));
+        //chain.set_ledger_canister(Principal.fromActor(this));
     };
 
     public shared(msg) func add_record(x: T.Action): async (DispatchResult) {

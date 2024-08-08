@@ -26,7 +26,7 @@ import Text "mo:base/Text";
 //ILDE reader NEW
 import reader "../src/reader";
 
-actor Self {
+actor class reader(exnum : Nat) = Self {
 
     // -- Ledger configuration
 
@@ -60,6 +60,8 @@ actor Self {
     //stable let chain_mem = rechain.Mem();
 
     stable let reader_mem = reader.Mem();
+
+    let exnum_ = exnum;
 
 
     // func encodeBlock(b: T.Action) : [rechain.ValueMap] {
@@ -180,22 +182,21 @@ actor Self {
     //     reducers = [balances.reducer];//, dedup.reducer];//, balancesIlde.reducer];  
     // });
 
-    var my_reader = reader.Reader<T.Action>({
-        mem : reader.Mem;
-        ledger_id : Principal;   // IMHERE: how do I pass the ledger principal from ts 
-        start_from_block: {#id:Nat; #last};
-        onError : (Text) -> (); // If error occurs during following and processing it will return the error
-        onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
-        onRead : [T.Action] -> ();
-        decodeBlock : (Block) -> T.Action;
-    }) //<----IMHERE
+    // var my_reader = reader.Reader<T.Action>({
+    //     mem : reader.Mem;
+    //     ledger_id : Principal;   // IMHERE: how do I pass the ledger principal from ts 
+    //     start_from_block: {#id:Nat; #last};
+    //     onError : (Text) -> (); // If error occurs during following and processing it will return the error
+    //     onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
+    //     onRead : [T.Action] -> ();
+    //     decodeBlock : (Block) -> T.Action;
+    // }) //<----IMHERE
 
     public shared(msg) func check_archives_balance(): async () {
         return await chain.check_archives_balance();
     };
 
     ignore Timer.setTimer<system>(#seconds 0, func () : async () {
-        Debug.print("inside setTimer");
         await chain.start_archiving<system>();
         await chain.start_archiveCycleMaintenance<system>();
 
@@ -209,6 +210,9 @@ actor Self {
 
     public shared(msg) func add_record(x: T.Action): async (DispatchResult) {
         //return icrc3().add_record<system>(x, null);
+
+        Debug.print("exnum_:"#debug_show(exnum_));
+        Debug.print("exnum:"#debug_show(exnum));
 
         let ret = chain.dispatch(x);  //handle error
         //add block to ledger

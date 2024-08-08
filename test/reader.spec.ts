@@ -43,7 +43,7 @@ export async function TestReader(pic: PocketIc, readerCanisterId: Principal) {
   const fixture = await pic.setupCanister<TestService_reader>({
     idlFactory: TestIdlFactory_reader,
     wasm: READER_READER_WASM_PATH,
-    arg: IDL.encode(init_reader({ IDL }), []), 
+    arg: IDL.encode(init_reader({ IDL }), [300]), 
   });
 
   return fixture;
@@ -53,7 +53,7 @@ export async function TestLedger(pic: PocketIc, ledgerCanisterId: Principal) {
   const fixture = await pic.setupCanister<TestService_ledger>({
     idlFactory: TestIdlFactory_ledger,
     wasm: READER_LEDGER_WASM_PATH,
-    arg: IDL.encode(init_ledger({ IDL }), []), 
+    arg: IDL.encode(init_ledger({ IDL }),[]), 
   });
 
   return fixture;
@@ -220,7 +220,7 @@ describe("reader", () => {
     pic = await PocketIc.create(process.env.PIC_URL); 
 
 
-    const fixture_ledger = await TestLedger(pic, Principal.fromText("aaaaa-aa"));
+    const fixture_ledger = await TestReader(pic, Principal.fromText("aaaaa-aa"));
     can_ledger = fixture_ledger.actor;
     canCanisterId_ledger = fixture_ledger.canisterId; 
     
