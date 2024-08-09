@@ -63,7 +63,55 @@ actor class reader(exnum : Nat) = Self {
 
     let exnum_ = exnum;
 
+    func decodeBlock(block: T.Value) : T.Action {
+        // ILDE---> how are the blocks I am generating?
+        // #Map([["phash",phash],["ts",ts],["btype",btype],["tx",tx]])
 
+        //BTB let's return a dummy action
+        //     public type Action = {
+        //     ts: Nat64;
+        //     created_at_time: ?Nat64; //ILDE: I have added after the discussion with V
+        //     memo: ?Blob; //ILDE: I have added after the discussion with V
+        //     caller: Principal;  //ILDE: I have added after the discussion with V 
+        //     fee: ?Nat;
+        //     payload : {
+        //         #burn : {
+        //             amt: Nat;
+        //             from: [Blob];
+        //         };
+        //         #transfer : {
+        //             to : [Blob];
+        //             from : [Blob];
+        //             amt : Nat;
+        //         };
+        //         #transfer_from : {
+        //             to : [Blob];
+        //             from : [Blob];
+        //             amt : Nat;
+        //         };
+        //         #mint : {
+        //             to : [Blob];
+        //             amt : Nat;
+        //         };
+        //     };
+        // };
+
+        let dummy_action = {
+            ts = 0;
+            create_at_time = 0;
+            memo = Blob("0");
+            caller = Principal.fromText("kxegj-ch6jp-46fed-oamn7-3t2xz-kquy4-qqicu-hprmr-yo7zi-j6adw-7ae");
+            fee = 0;
+            payload = #mint({to=[Principal.fromText("kxegj-ch6jp-46fed-oamn7-3t2xz-kquy4-qqicu-hprmr-yo7zi-j6adw-7ae")];
+                             amt=100;});
+            };
+
+        dummy_action;
+    };
+
+    func getTimeFromAction(action: T.Action) : Nat64 {
+        actions.ts;
+    }
     // func encodeBlock(b: T.Action) : [rechain.ValueMap] {
 
     //     let created_at_time: Nat64 = switch (b.created_at_time) {
@@ -320,6 +368,7 @@ actor class reader(exnum : Nat) = Self {
         return ret;
 
     };
+
 
     public type DispatchResult = {#Ok : Nat;  #Err: T.ActionError };
 

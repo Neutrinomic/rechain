@@ -33,6 +33,18 @@ module {
             };
         };
 
+    // Sorting blocks by id and removing the ids so we can pass to the decode method
+    public type nullblock = ?Block;
+
+    public func sortBlocksById(blocks: [{block : nullblock; id : Nat}]) : [nullblock] { 
+        func my_compare(a:{block : nullblock; id : Nat}, b:{block : nullblock; id : Nat}) : {#less; #equal; #greater} {
+            if (a.id < b.id) { #less } else if (a.id == b.id) { #equal } else { #greater };
+        };
+        let sorted_nullblocks_wid = Array.sort<{block : nullblock; id : Nat}>(blocks:[{block : nullblock; id : Nat}], my_compare);
+        let sorted_nullblocks = Array.map<{block : nullblock; id : Nat}, nullblock>(sorted_nullblocks_wid, func x = x.block);
+        //Array.filter<nullblock>(sorted_nullblocks, func x = (x!=null));
+    };
+
     // follows ICRC3 backlog and sends transactions to onRead ordered. Converts generic value to action using decodeBlock
     // Problems:
     // - make it use ICRC3 methods
@@ -44,7 +56,8 @@ module {
         onError : (Text) -> (); // If error occurs during following and processing it will return the error
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
         onRead : [A] -> ();
-        decodeBlock : (Block) -> A;
+        decodeBlock : (?Block) -> A;       //ILDE:Block -> ?Block for convenience in conversions
+        getTimeFromAction : A -> Nat64;    //ILDE:added
     }) {
         var started = false;
         let ledger = actor (Principal.toText(ledger_id)) : T.ICRC3Interface;//Ledger.Self;//<<<----IMHERE I need the interface
@@ -60,49 +73,81 @@ module {
                         mem.last_indexed_tx := id;
                     };
                     case (#last) {
-                        let rez = await ledger.get_transactions({
+                        let rez = await ledger.icrc3_get_blocks([{
                             start = 0;
                             length = 0;
-                        });
+                        }]);
                         mem.last_indexed_tx := rez.log_length -1;
                     };
                 };
             };
 
-            let rez = await ledger.get_transactions({
+            let rez = await ledger.icrc3_get_blocks([{
                 start = mem.last_indexed_tx;
                 length = 1000;
-            });
+            }]);
 
-            if (rez.archived_transactions.size() == 0) {
+            if (rez.archived_blocks.size() == 0) {
                 // We can just process the transactions that are inside the ledger and not inside archive
-                onRead(rez.transactions);
-                mem.last_indexed_tx += rez.transactions.size();
-                if (rez.transactions.size() < 1000) {
+            
+                //ILDE
+                let sorted_blocks = sortBlocksById(rez.blocks);
+                let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
+                onRead(decoded_actions);//rez.blocks);//transactions);
+                
+                mem.last_indexed_tx += rez.blocks.size();//transactions.size();
+                if (rez.blocks.size() < 1000) {//transactions.size() < 1000) {
                     // We have reached the end, set the last tx time to the current time
                     lastTxTime := Nat64.fromNat(Int.abs(Time.now()));
                 } else {
                     // Set the time of the last transaction
-                    lastTxTime := rez.transactions[rez.transactions.size() - 1].timestamp;
+                    // ILDE: I need to use 
+                    //before: lastTxTime := rez.transactions[rez.transactions.size() - 1].timestamp;
+                    lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
                 };
-            } else {
+            } else {   //<-----------IMHERE
                 // We need to collect transactions from archive and get them in order
-                let unordered = Vector.new<BlocksUnordered>(); // Probably a better idea would be to use a large enough var array
 
-                for (atx in rez.archived_transactions.vals()) {
-                    let txresp = await atx.callback({
-                        start = atx.start;
-                        length = atx.length;
-                    });
+                type myBlocksUnorderedtype = {
+                    start : Nat;
+                    transactions : [{block : ?Block; id : Nat}];
+                };
 
+                //ILDE let unordered = Vector.new<BlocksUnordered>(); // Probably a better idea would be to use a large enough var array
+                let unordered = Vector.new<myBlocksUnorderedtype>(); 
+
+                //ILDE
+                for (atx in rez.archived_blocks.vals()) {
+                    let i = 0;
+                    let txresp = await atx.callback(atx.args);//{
+                    //     start = atx.args[i].start;
+                    //     length = atx.args[i].length;
+                    // });
+                    // blocks : [{block : ?Value; id : Nat}];
                     Vector.add(
                         unordered,
                         {
-                            start = atx.start;
-                            transactions = txresp.transactions;
+                            start = atx.args[i].start;
+                            transactions = txresp.blocks;
                         },
                     );
                 };
+
+                //BEFORE
+                // for (atx in rez.archived_transactions.vals()) {
+                //     let txresp = await atx.callback({
+                //         start = atx.start;
+                //         length = atx.length;
+                //     });
+
+                //     Vector.add(
+                //         unordered,
+                //         {
+                //             start = atx.start;
+                //             transactions = txresp.transactions;
+                //         },
+                //     );
+                // };
 
                 let sorted = Array.sort<BlocksUnordered>(Vector.toArray(unordered), func(a, b) = Nat.compare(a.start, b.start));
 
