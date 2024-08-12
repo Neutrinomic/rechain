@@ -10,6 +10,7 @@ import Nat "mo:base/Nat";
 //import Deduplication "./reducers/deduplication";
 import Deduplication "./ledger/reducers/deduplication";
 import T "./ledger/types";
+import Trechain "../src/types";
 //import Balances "reducers/balances";
 import Balances "./ledger/reducers/balances";
 import Sha256 "mo:sha2/Sha256";
@@ -26,7 +27,7 @@ import Text "mo:base/Text";
 //ILDE reader NEW
 import reader "../src/reader";
 
-actor class reader(exnum : Nat) = Self {
+actor class reader_reader(ledger_pid : Principal) = Self {
 
     // -- Ledger configuration
 
@@ -59,11 +60,11 @@ actor class reader(exnum : Nat) = Self {
 
     //stable let chain_mem = rechain.Mem();
 
-    stable let reader_mem = reader.Mem();
+    //stable let reader_mem = reader.Mem();
 
-    let exnum_ = exnum;
+    //let exnum_ = exnum;
 
-    func decodeBlock(block: T.Value) : T.Action {
+    func decodeBlock(block: ?Trechain.Value) : T.Action {
         // ILDE---> how are the blocks I am generating?
         // #Map([["phash",phash],["ts",ts],["btype",btype],["tx",tx]])
 
@@ -96,13 +97,13 @@ actor class reader(exnum : Nat) = Self {
         //     };
         // };
 
-        let dummy_action = {
+        let dummy_action: T.Action = {
             ts = 0;
-            create_at_time = 0;
-            memo = Blob("0");
+            created_at_time = ?0;
+            memo = null;//Blob("0");
             caller = Principal.fromText("kxegj-ch6jp-46fed-oamn7-3t2xz-kquy4-qqicu-hprmr-yo7zi-j6adw-7ae");
-            fee = 0;
-            payload = #mint({to=[Principal.fromText("kxegj-ch6jp-46fed-oamn7-3t2xz-kquy4-qqicu-hprmr-yo7zi-j6adw-7ae")];
+            fee = ?0;
+            payload = #mint({to=[Principal.toBlob(Principal.fromText("kxegj-ch6jp-46fed-oamn7-3t2xz-kquy4-qqicu-hprmr-yo7zi-j6adw-7ae"))];
                              amt=100;});
             };
 
@@ -110,8 +111,40 @@ actor class reader(exnum : Nat) = Self {
     };
 
     func getTimeFromAction(action: T.Action) : Nat64 {
-        actions.ts;
-    }
+        action.ts;
+    };
+
+    func onRead(actions: [T.Action]) {
+        Debug.print(debug_show(actions));
+    };
+
+    func onError(error_text: Text) {   //ILDE: TBD: use SysLog
+        Debug.print(debug_show(error_text));
+    };
+
+    func onCycleEnd(total_inst: Nat64) {   //ILDE: TBD: use SysLog
+        Debug.print(debug_show(total_inst));
+    };
+
+    stable let reader_mem = reader.Mem();
+    var my_reader = reader.Reader<T.Action>({
+        mem = reader_mem;
+        ledger_id = ledger_pid;
+        start_from_block = #last; // ILDE: I DONT FULLY GET THIS ONE:   {#id:Nat; #last};
+        onError = onError; // If error occurs during following and processing it will return the error
+        onCycleEnd = onCycleEnd; // Measure performance of following and processing transactions. Returns instruction count
+        onRead = onRead;
+        decodeBlock = decodeBlock;       //ILDE:Block -> ?Block for convenience in conversions
+        getTimeFromAction = getTimeFromAction;
+    });
+    
+    ignore Timer.setTimer<system>(#seconds 0, func () : async () {
+        Debug.print("inside setTimer of reader");
+        Debug.print("ledger pid from insider reader:"#debug_show(ledger_pid));
+        await my_reader.start<system>();
+
+        //await chain.start_archiveCycleMaintenance<system>(); 
+    });
     // func encodeBlock(b: T.Action) : [rechain.ValueMap] {
 
     //     let created_at_time: Nat64 = switch (b.created_at_time) {
@@ -210,6 +243,16 @@ actor class reader(exnum : Nat) = Self {
     //     ];
     // };
 
+    public func enable(): async ()   {
+        await my_reader.enable();
+    };
+    public func disable(): async ()  {
+        await my_reader.disable();
+    };
+    //     let ret = ?Blob.fromArray(RepIndy.hash_val(auxm1));
+    //     return ret;
+    // };
+
     // public query func compute_hash(auxm1: rechain.Value) : async ?Blob {
     //     let ret = ?Blob.fromArray(RepIndy.hash_val(auxm1));
     //     return ret;
@@ -240,140 +283,140 @@ actor class reader(exnum : Nat) = Self {
     //     decodeBlock : (Block) -> T.Action;
     // }) //<----IMHERE
 
-    public shared(msg) func check_archives_balance(): async () {
-        return await chain.check_archives_balance();
-    };
+    // public shared(msg) func check_archives_balance(): async () {
+    //     return await chain.check_archives_balance();
+    // };
 
-    ignore Timer.setTimer<system>(#seconds 0, func () : async () {
-        await chain.start_archiving<system>();
-        await chain.start_archiveCycleMaintenance<system>();
+    // ignore Timer.setTimer<system>(#seconds 0, func () : async () {
+    //     await chain.start_archiving<system>();
+    //     await chain.start_archiveCycleMaintenance<system>();
 
-        //await chain.start_archiveCycleMaintenance<system>(); 
-    });
+    //     //await chain.start_archiveCycleMaintenance<system>(); 
+    // });
 
-    public shared(msg) func set_ledger_canister(): async () {
-        chain_mem.canister := ?Principal.fromActor(Self);
-        //chain.set_ledger_canister(Principal.fromActor(Self));
-    };
+    // public shared(msg) func set_ledger_canister(): async () {
+    //     chain_mem.canister := ?Principal.fromActor(Self);
+    //     //chain.set_ledger_canister(Principal.fromActor(Self));
+    // };
 
-    public shared(msg) func add_record(x: T.Action): async (DispatchResult) {
-        //return icrc3().add_record<system>(x, null);
+    // public shared(msg) func add_record(x: T.Action): async (DispatchResult) {
+    //     //return icrc3().add_record<system>(x, null);
 
-        Debug.print("exnum_:"#debug_show(exnum_));
-        Debug.print("exnum:"#debug_show(exnum));
+    //     Debug.print("exnum_:"#debug_show(exnum_));
+    //     Debug.print("exnum:"#debug_show(exnum));
 
-        let ret = chain.dispatch(x);  //handle error
-        //add block to ledger
+    //     let ret = chain.dispatch(x);  //handle error
+    //     //add block to ledger
 
-        return ret;
+    //     return ret;
 
 
-    };
+    // };
 
-    // ICRC-1
-    public shared ({ caller }) func icrc1_transfer(req : ICRC.TransferArg) : async ICRC.Result {
-        let ret = transfer(caller, req);
-        ret;
-    };
+    // // ICRC-1
+    // public shared ({ caller }) func icrc1_transfer(req : ICRC.TransferArg) : async ICRC.Result {
+    //     let ret = transfer(caller, req);
+    //     ret;
+    // };
 
-    public query func icrc1_balance_of(acc: ICRC.Account) : async Nat {
-        balances.get(acc)
-    };
+    // public query func icrc1_balance_of(acc: ICRC.Account) : async Nat {
+    //     balances.get(acc)
+    // };
  
-    private func transfer(caller:Principal, req:ICRC.TransferArg) : ICRC.Result {
-        let from : ICRC.Account = {
-            owner = caller;
-            subaccount = req.from_subaccount;
-        };
+    // private func transfer(caller:Principal, req:ICRC.TransferArg) : ICRC.Result {
+    //     let from : ICRC.Account = {
+    //         owner = caller;
+    //         subaccount = req.from_subaccount;
+    //     };
 
-        let payload = if (from == config.MINTING_ACCOUNT) {   
-            let pri_blob: Blob = Principal.toBlob(req.to.owner);
-            let aux = req.to.subaccount;
-            let to_blob: [Blob] = switch aux {
-                case (?Blob) [pri_blob, Blob];
-                case (_) [pri_blob];
-            };
-            #mint({
-                to = to_blob;
-                amt = req.amount;
-            });
-        } else if (req.to == config.MINTING_ACCOUNT) {
-            let from_blob: [Blob] = switch (req.from_subaccount) {
-                case (?Blob) [Blob];
-                case (_) [("0": Blob)];
-            };
-            #burn({
-                from = from_blob;
-                amt = req.amount;
-            });
-        } else if (false){
-            let fee:Nat = switch(req.fee) {
-                case (?Nat) Nat;
-                case (_) 0:Nat;
-            };
-            let pri_blob: Blob = Principal.toBlob(req.to.owner);
-            let aux = req.to.subaccount;
-            let to_blob: [Blob] = switch aux {
-                case (?Blob) [pri_blob, Blob];
-                case (_) [pri_blob];
-            };
-            let from_blob: [Blob] = switch (req.from_subaccount) {
-                case (?Blob) [Blob];
-                case (_) [("0": Blob)];
-            };
-            #transfer_from({
-                to = to_blob;
-                from = from_blob;
-                amt = req.amount;
-            });
-        } else {
-            let fee:Nat = switch(req.fee) {
-                case (?Nat) Nat;
-                case (_) 0:Nat;
-            };
-            let pri_blob: Blob = Principal.toBlob(req.to.owner);
-            let aux = req.to.subaccount;
-            let to_blob: [Blob] = switch aux {
-                case (?Blob) [pri_blob, Blob];
-                case (_) [pri_blob];
-            };
-            let from_blob: [Blob] = switch (req.from_subaccount) {
-                case (?Blob) [Blob];
-                case (_) [("0": Blob)];
-            };
-            #transfer({
-                to = to_blob;
-                fee = fee;
-                from = from_blob;
-                amt = req.amount;
-            });
-        };
+    //     let payload = if (from == config.MINTING_ACCOUNT) {   
+    //         let pri_blob: Blob = Principal.toBlob(req.to.owner);
+    //         let aux = req.to.subaccount;
+    //         let to_blob: [Blob] = switch aux {
+    //             case (?Blob) [pri_blob, Blob];
+    //             case (_) [pri_blob];
+    //         };
+    //         #mint({
+    //             to = to_blob;
+    //             amt = req.amount;
+    //         });
+    //     } else if (req.to == config.MINTING_ACCOUNT) {
+    //         let from_blob: [Blob] = switch (req.from_subaccount) {
+    //             case (?Blob) [Blob];
+    //             case (_) [("0": Blob)];
+    //         };
+    //         #burn({
+    //             from = from_blob;
+    //             amt = req.amount;
+    //         });
+    //     } else if (false){
+    //         let fee:Nat = switch(req.fee) {
+    //             case (?Nat) Nat;
+    //             case (_) 0:Nat;
+    //         };
+    //         let pri_blob: Blob = Principal.toBlob(req.to.owner);
+    //         let aux = req.to.subaccount;
+    //         let to_blob: [Blob] = switch aux {
+    //             case (?Blob) [pri_blob, Blob];
+    //             case (_) [pri_blob];
+    //         };
+    //         let from_blob: [Blob] = switch (req.from_subaccount) {
+    //             case (?Blob) [Blob];
+    //             case (_) [("0": Blob)];
+    //         };
+    //         #transfer_from({
+    //             to = to_blob;
+    //             from = from_blob;
+    //             amt = req.amount;
+    //         });
+    //     } else {
+    //         let fee:Nat = switch(req.fee) {
+    //             case (?Nat) Nat;
+    //             case (_) 0:Nat;
+    //         };
+    //         let pri_blob: Blob = Principal.toBlob(req.to.owner);
+    //         let aux = req.to.subaccount;
+    //         let to_blob: [Blob] = switch aux {
+    //             case (?Blob) [pri_blob, Blob];
+    //             case (_) [pri_blob];
+    //         };
+    //         let from_blob: [Blob] = switch (req.from_subaccount) {
+    //             case (?Blob) [Blob];
+    //             case (_) [("0": Blob)];
+    //         };
+    //         #transfer({
+    //             to = to_blob;
+    //             fee = fee;
+    //             from = from_blob;
+    //             amt = req.amount;
+    //         });
+    //     };
 
-        let ts:Nat64 = switch (req.created_at_time) {
-            case (?Nat64) Nat64;
-            case (_) 0:Nat64;
-        };
+    //     let ts:Nat64 = switch (req.created_at_time) {
+    //         case (?Nat64) Nat64;
+    //         case (_) 0:Nat64;
+    //     };
 
-        let action = {
-            caller = caller;
-            ts = ts;
-            created_at_time = req.created_at_time;
-            memo = req.memo;
-            fee = req.fee;
-            payload = payload;
-        };
+    //     let action = {
+    //         caller = caller;
+    //         ts = ts;
+    //         created_at_time = req.created_at_time;
+    //         memo = req.memo;
+    //         fee = req.fee;
+    //         payload = payload;
+    //     };
 
-        let ret = chain.dispatch(action);
+    //     let ret = chain.dispatch(action);
 
-        return ret;
+    //     return ret;
 
-    };
+    // };
 
 
-    public type DispatchResult = {#Ok : Nat;  #Err: T.ActionError };
+    // public type DispatchResult = {#Ok : Nat;  #Err: T.ActionError };
 
-    public func dispatch(actions: [T.Action]): async [DispatchResult] {
-        Array.map(actions, func(x: T.Action): DispatchResult = chain.dispatch(x));
-    };
+    // public func dispatch(actions: [T.Action]): async [DispatchResult] {
+    //     Array.map(actions, func(x: T.Action): DispatchResult = chain.dispatch(x));
+    // };
 
 };

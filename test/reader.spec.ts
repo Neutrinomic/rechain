@@ -39,15 +39,7 @@ import { toState } from "@infu/icblast";
 const READER_READER_WASM_PATH = resolve(__dirname, "./build/reader_reader.wasm");
 const READER_LEDGER_WASM_PATH = resolve(__dirname, "./build/reader_ledger.wasm");
 
-export async function TestReader(pic: PocketIc, readerCanisterId: Principal) {
-  const fixture = await pic.setupCanister<TestService_reader>({
-    idlFactory: TestIdlFactory_reader,
-    wasm: READER_READER_WASM_PATH,
-    arg: IDL.encode(init_reader({ IDL }), [300]), 
-  });
 
-  return fixture;
-}
 
 export async function TestLedger(pic: PocketIc, ledgerCanisterId: Principal) {
   const fixture = await pic.setupCanister<TestService_ledger>({
@@ -58,6 +50,17 @@ export async function TestLedger(pic: PocketIc, ledgerCanisterId: Principal) {
 
   return fixture;
 }
+
+export async function TestReader(pic: PocketIc, readerCanisterId: Principal, ledger_pid: Principal) {
+  const fixture = await pic.setupCanister<TestService_reader>({
+    idlFactory: TestIdlFactory_reader,
+    wasm: READER_READER_WASM_PATH,
+    arg: IDL.encode(init_reader({ IDL }), [ledger_pid]), 
+  });
+
+  return fixture;
+}
+
 
 function decodeBlock2(my_blocks:GetTransactionsResult, block_pos:number ) {
   // console.log(my_blocks.blocks[0]);
@@ -200,6 +203,8 @@ describe("reader", () => {
   let pic: PocketIc;
   let can_ledger: Actor<TestService_ledger>;
   let canCanisterId_ledger: Principal;
+  let can_reader: Actor<TestService_reader>;
+  let canCanisterId_readerr: Principal;
 
   const jo = createIdentity('superSecretAlicePassword');
   const bob = createIdentity('superSecretBobPassword');
@@ -219,12 +224,17 @@ describe("reader", () => {
   beforeAll(async () => {
     pic = await PocketIc.create(process.env.PIC_URL); 
 
-
-    const fixture_ledger = await TestReader(pic, Principal.fromText("aaaaa-aa"));
+    //Create ledger
+    const fixture_ledger = await TestLedger(pic, Principal.fromText("aaaaa-aa"));
     can_ledger = fixture_ledger.actor;
     canCanisterId_ledger = fixture_ledger.canisterId; 
     
     await can_ledger.set_ledger_canister();
+
+    //Create reader
+    const fixture_reader = await TestReader(pic, Principal.fromText("aaaaa-aa"), canCanisterId_ledger);
+    can_reader = fixture_reader.actor;
+    canCanisterId_ledger = fixture_reader.canisterId; 
 
   });
 
@@ -260,10 +270,25 @@ describe("reader", () => {
                                 'subaccount' : []};
     let r_balance = await can_ledger.icrc1_balance_of(my_account);
     console.log("John0 balance: ", r_balance);
+    
+    //start reader
+    await can_reader.enable();
+    //do some waiting
+    passTime(3);
+
+    i = 0n;
+    for (; i < 100; i++) {
+      let r = await can_ledger.add_record(my_mint_action);
+    }
+    
+    console.log("end enabled");
+    
+
 
     expect(true).toBe(true);
 
-
+    let r_balance2 = await can_ledger.icrc1_balance_of(my_account);
+    console.log("John0 balance: ", r_balance2);
 
     // let r_mint2 = await can_ledger.add_record(my_mint_action);
     // let r_mint3 = await can_ledger.add_record(my_mint_action);

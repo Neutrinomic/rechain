@@ -64,6 +64,7 @@ module {
         var lastTxTime : Nat64 = 0;
 
         private func cycle() : async () {
+            Debug.print("in cycle()");
             if (not started) return;
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
 
@@ -72,12 +73,12 @@ module {
                     case (#id(id)) {
                         mem.last_indexed_tx := id;
                     };
-                    case (#last) {
+                    case (#last) { // ILDE: <---------------------THIS SEEMS POINTLESS
                         let rez = await ledger.icrc3_get_blocks([{
                             start = 0;
                             length = 0;
                         }]);
-                        mem.last_indexed_tx := rez.log_length -1;
+                        mem.last_indexed_tx := rez.log_length -1;   //ILDE: 0 - 1 = -1...WHY????
                     };
                 };
             };
@@ -98,14 +99,14 @@ module {
                 mem.last_indexed_tx += rez.blocks.size();//transactions.size();
                 if (rez.blocks.size() < 1000) {//transactions.size() < 1000) {
                     // We have reached the end, set the last tx time to the current time
-                    lastTxTime := Nat64.fromNat(Int.abs(Time.now()));
+                    lastTxTime := Nat64.fromNat(Int.abs(Time.now())); //ILDE: possible bug this should use "getTimeFromAction"
                 } else {
                     // Set the time of the last transaction
                     // ILDE: I need to use 
                     //before: lastTxTime := rez.transactions[rez.transactions.size() - 1].timestamp;
                     lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
                 };
-            } else {   //<-----------IMHERE
+            } else {   
                 // We need to collect transactions from archive and get them in order
 
                 type myBlocksUnorderedtype = {
@@ -124,6 +125,7 @@ module {
                     //     length = atx.args[i].length;
                     // });
                     // blocks : [{block : ?Value; id : Nat}];
+                    
                     Vector.add(
                         unordered,
                         {
@@ -149,17 +151,33 @@ module {
                 //     );
                 // };
 
-                let sorted = Array.sort<BlocksUnordered>(Vector.toArray(unordered), func(a, b) = Nat.compare(a.start, b.start));
+                //ILDE let sorted = Array.sort<BlocksUnordered>(Vector.toArray(unordered), func(a, b) = Nat.compare(a.start, b.start));
+                let sorted = Array.sort<myBlocksUnorderedtype>(Vector.toArray(unordered), func(a, b) = Nat.compare(a.start, b.start));
 
+                //<----IMHERE
                 for (u in sorted.vals()) {
                     assert (u.start == mem.last_indexed_tx);
-                    onRead(u.transactions);
+                    //onRead(u.transactions);
+                    //ILDE
+                    let sorted_blocks = sortBlocksById(u.transactions);//blocks);
+                    let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
+                    onRead(decoded_actions);//rez.blocks);//transactions);
+
                     mem.last_indexed_tx += u.transactions.size();
+                    //rez.blocks.size();//transactions.size();
                 };
 
-                if (rez.transactions.size() != 0) {
-                    onRead(rez.transactions);
-                    mem.last_indexed_tx += rez.transactions.size();
+                //ILDE
+                // if (rez.transactions.size() != 0) {
+                //     onRead(rez.transactions);
+                //     mem.last_indexed_tx += rez.transactions.size();
+                // };
+                if (rez.blocks.size() != 0) {
+                    let sorted_blocks = sortBlocksById(rez.blocks);
+                    let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
+                    onRead(decoded_actions);//rez.blocks);//transactions);
+                    //onRead(rez.transactions);
+                    mem.last_indexed_tx += rez.blocks.size();
                 };
             };
 
@@ -180,16 +198,20 @@ module {
                 onError("cycle:" # Principal.toText(ledger_id) # ":" # Error.message(e));
             };
 
-            if (started) ignore Timer.setTimer(#seconds 2, cycle_shell);
+            if (started) ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
         };
 
-        public func start() {
-            if (started) Debug.trap("already started");
+        public func start<system>(): async () {
+            if (started) Debug.print("already started");//Debug.trap("already started");
+            //started := true;
+            ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
+        };
+
+        public func enable() : async () {
             started := true;
-            ignore Timer.setTimer(#seconds 2, cycle_shell);
         };
 
-        public func stop() {
+        public func disable() : async () {
             started := false;
         }
     };
