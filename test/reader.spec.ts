@@ -274,15 +274,18 @@ describe("reader", () => {
     //start reader
     await can_reader.enable();
     //do some waiting
-    passTime(3);
+    await passTime(3);
 
     i = 0n;
     for (; i < 100; i++) {
       let r = await can_ledger.add_record(my_mint_action);
     }
+
+    await passTime(3);
     
     console.log("end enabled");
-    
+
+    can_ledger.print_ledger();  
 
 
     expect(true).toBe(true);
@@ -319,7 +322,7 @@ describe("reader", () => {
     //   expect(true).toBe(JSON.stringify(decodedBlock2.phash) === JSON.stringify(phash_hat2[0]));
     // };
    
-  });
+  },60000);
 
   // it("check_archives_balance", async () => {
        

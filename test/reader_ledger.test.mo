@@ -10,6 +10,7 @@ import Nat "mo:base/Nat";
 //import Deduplication "./reducers/deduplication";
 import Deduplication "./ledger/reducers/deduplication";
 import T "./ledger/types";
+import Trechain "../src/types";
 //import Balances "reducers/balances";
 import Balances "./ledger/reducers/balances";
 import Sha256 "mo:sha2/Sha256";
@@ -189,6 +190,14 @@ actor Self {//KeyValue(phonebook : Nat){
     public shared(msg) func set_ledger_canister(): async () {
         chain_mem.canister := ?Principal.fromActor(Self);
         //chain.set_ledger_canister(Principal.fromActor(this));
+    };
+
+    public shared(msg) func print_ledger () {
+        Debug.print("print_ledger");
+        Debug.print(debug_show(chain_mem.lastIndex));
+        //Debug.print(debug_show(chain_mem.history));
+        
+        Debug.print("ENDPRINTLEDGR");
     };
 
     public shared(msg) func add_record(x: T.Action): async (DispatchResult) {

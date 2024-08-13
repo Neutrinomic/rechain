@@ -65,6 +65,7 @@ module {
 
         private func cycle() : async () {
             Debug.print("in cycle()");
+            Debug.print("started:"#debug_show(started));
             if (not started) return;
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
 
@@ -73,12 +74,12 @@ module {
                     case (#id(id)) {
                         mem.last_indexed_tx := id;
                     };
-                    case (#last) { // ILDE: <---------------------THIS SEEMS POINTLESS
+                    case (#last) { 
                         let rez = await ledger.icrc3_get_blocks([{
                             start = 0;
                             length = 0;
                         }]);
-                        mem.last_indexed_tx := rez.log_length -1;   //ILDE: 0 - 1 = -1...WHY????
+                        mem.last_indexed_tx := rez.log_length -1;  // It gives info of ldeger length
                     };
                 };
             };
@@ -93,7 +94,15 @@ module {
             
                 //ILDE
                 let sorted_blocks = sortBlocksById(rez.blocks);
+
                 let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
+                Debug.print("before onRead 1");
+                //ledger.print_ledger();
+                Debug.print("lastIndex:"#debug_show(mem.last_indexed_tx));
+                Debug.print(debug_show(rez.blocks.size()));
+                Debug.print(debug_show(rez.archived_blocks.size()));
+                Debug.print(debug_show(sorted_blocks.size()));
+                Debug.print(debug_show(decoded_actions.size()));
                 onRead(decoded_actions);//rez.blocks);//transactions);
                 
                 mem.last_indexed_tx += rez.blocks.size();//transactions.size();
@@ -161,6 +170,9 @@ module {
                     //ILDE
                     let sorted_blocks = sortBlocksById(u.transactions);//blocks);
                     let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
+                    Debug.print("before onRead 2");
+                    Debug.print(debug_show(sorted_blocks.size()));
+                    Debug.print(debug_show(decoded_actions.size()));
                     onRead(decoded_actions);//rez.blocks);//transactions);
 
                     mem.last_indexed_tx += u.transactions.size();
@@ -175,6 +187,9 @@ module {
                 if (rez.blocks.size() != 0) {
                     let sorted_blocks = sortBlocksById(rez.blocks);
                     let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
+                    Debug.print("before onRead 3");
+                    Debug.print(debug_show(sorted_blocks.size()));
+                    Debug.print(debug_show(decoded_actions.size()));
                     onRead(decoded_actions);//rez.blocks);//transactions);
                     //onRead(rez.transactions);
                     mem.last_indexed_tx += rez.blocks.size();
@@ -183,6 +198,7 @@ module {
 
             let inst_end = Prim.performanceCounter(1); // 1 is preserving with async
             onCycleEnd(inst_end - inst_start);
+            Debug.print("started:"#debug_show(started));
         };
 
         /// Returns the last tx time or the current time if there are no more transactions to read

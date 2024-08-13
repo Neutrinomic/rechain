@@ -115,14 +115,17 @@ actor class reader_reader(ledger_pid : Principal) = Self {
     };
 
     func onRead(actions: [T.Action]) {
+        Debug.print("onRead:");
         Debug.print(debug_show(actions));
     };
 
     func onError(error_text: Text) {   //ILDE: TBD: use SysLog
+        Debug.print("onError:");
         Debug.print(debug_show(error_text));
     };
 
     func onCycleEnd(total_inst: Nat64) {   //ILDE: TBD: use SysLog
+        Debug.print("onCycleEnd:");
         Debug.print(debug_show(total_inst));
     };
 
@@ -130,7 +133,9 @@ actor class reader_reader(ledger_pid : Principal) = Self {
     var my_reader = reader.Reader<T.Action>({
         mem = reader_mem;
         ledger_id = ledger_pid;
-        start_from_block = #last; // ILDE: I DONT FULLY GET THIS ONE:   {#id:Nat; #last};
+        start_from_block = #id(0);//last; 
+        // ILDE: I DONT FULLY GET THIS ONE:   {#id:Nat; #last};
+        // id(i) means start from i, last means start from the last block (basically show nothing but n ew blocks)
         onError = onError; // If error occurs during following and processing it will return the error
         onCycleEnd = onCycleEnd; // Measure performance of following and processing transactions. Returns instruction count
         onRead = onRead;
