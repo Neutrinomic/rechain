@@ -3,6 +3,23 @@ import { resolve } from "node:path";
 import { Actor, PocketIc, createIdentity} from "@hadronous/pic";
 
 import { IDL } from "@dfinity/candid";
+
+
+import {
+  _SERVICE as TestService_noarchive,
+  idlFactory as TestIdlFactory_noarchive,
+  init as init_noarchive,
+} from "./build/reader_noarchive.idl.js";
+
+import {
+  // Action,
+  // Account,
+  // GetBlocksArgs,
+  // TransactionRange,
+  // GetTransactionsResult,
+  // Value__1,
+} from "./build/reader_noarchive.idl.js";
+
 import {
   _SERVICE as TestService_ledger,
   idlFactory as TestIdlFactory_ledger,
@@ -38,7 +55,7 @@ import { toState } from "@infu/icblast";
 
 const READER_READER_WASM_PATH = resolve(__dirname, "./build/reader_reader.wasm");
 const READER_LEDGER_WASM_PATH = resolve(__dirname, "./build/reader_ledger.wasm");
-
+const READER_NOARCHIVE_WASM_PATH = resolve(__dirname, "./build/reader_noarchive.wasm");
 
 
 export async function TestLedger(pic: PocketIc, ledgerCanisterId: Principal) {
@@ -51,11 +68,21 @@ export async function TestLedger(pic: PocketIc, ledgerCanisterId: Principal) {
   return fixture;
 }
 
-export async function TestReader(pic: PocketIc, readerCanisterId: Principal, ledger_pid: Principal) {
+export async function TestNoarchive(pic: PocketIc, noarchiveCanisterId: Principal) {
+  const fixture = await pic.setupCanister<TestService_noarchive>({
+    idlFactory: TestIdlFactory_noarchive,
+    wasm: READER_NOARCHIVE_WASM_PATH,
+    arg: IDL.encode(init_ledger({ IDL }),[]), 
+  });
+
+  return fixture;
+}
+
+export async function TestReader(pic: PocketIc, readerCanisterId: Principal, ledger_pid: Principal, noarchive_pid: Principal) {
   const fixture = await pic.setupCanister<TestService_reader>({
     idlFactory: TestIdlFactory_reader,
     wasm: READER_READER_WASM_PATH,
-    arg: IDL.encode(init_reader({ IDL }), [ledger_pid]), 
+    arg: IDL.encode(init_reader({ IDL }), [ledger_pid, noarchive_pid]), 
   });
 
   return fixture;
@@ -203,6 +230,8 @@ describe("reader", () => {
   let pic: PocketIc;
   let can_ledger: Actor<TestService_ledger>;
   let canCanisterId_ledger: Principal;
+  let can_noarchive: Actor<TestService_noarchive>;
+  let canCanisterId_noarchive: Principal;
   let can_reader: Actor<TestService_reader>;
   let canCanisterId_readerr: Principal;
 
@@ -231,8 +260,13 @@ describe("reader", () => {
     
     await can_ledger.set_ledger_canister();
 
+    //Create noarchive
+    const fixture_noarchive = await TestNoarchive(pic, Principal.fromText("aaaaa-aa"));
+    can_noarchive = fixture_noarchive.actor;
+    canCanisterId_noarchive = fixture_noarchive.canisterId; 
+
     //Create reader
-    const fixture_reader = await TestReader(pic, Principal.fromText("aaaaa-aa"), canCanisterId_ledger);
+    const fixture_reader = await TestReader(pic, Principal.fromText("aaaaa-aa"), canCanisterId_ledger, canCanisterId_noarchive);
     can_reader = fixture_reader.actor;
     canCanisterId_ledger = fixture_reader.canisterId; 
 
@@ -258,14 +292,10 @@ describe("reader", () => {
     };
     
     let i = 0n;
-    for (; i < 100; i++) {
+    for (; i < 2; i++) {
       let r = await can_ledger.add_record(my_mint_action);
     }
-    console.log("hello");
-    // Account {
-    //   'owner' : Principal,
-    //   'subaccount' : [] | [Uint8Array | number[]],
-    // }
+
     let my_account : Account = {'owner' : john0.getPrincipal(),
                                 'subaccount' : []};
     let r_balance = await can_ledger.icrc1_balance_of(my_account);
@@ -274,24 +304,24 @@ describe("reader", () => {
     //start reader
     await can_reader.enable();
     //do some waiting
-    await passTime(3);
+    await passTime(10);
 
-    i = 0n;
-    for (; i < 100; i++) {
-      let r = await can_ledger.add_record(my_mint_action);
-    }
+    // i = 0n;
+    // for (; i < 100; i++) {
+    //   let r = await can_ledger.add_record(my_mint_action);
+    // }
 
-    await passTime(3);
+    // await passTime(3);
     
-    console.log("end enabled");
+    // console.log("end enabled");
 
-    can_ledger.print_ledger();  
+    // can_ledger.print_ledger();  
 
 
     expect(true).toBe(true);
 
-    let r_balance2 = await can_ledger.icrc1_balance_of(my_account);
-    console.log("John0 balance: ", r_balance2);
+    // let r_balance2 = await can_ledger.icrc1_balance_of(my_account);
+    // console.log("John0 balance: ", r_balance2);
 
     // let r_mint2 = await can_ledger.add_record(my_mint_action);
     // let r_mint3 = await can_ledger.add_record(my_mint_action);

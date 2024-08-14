@@ -27,7 +27,7 @@ import Text "mo:base/Text";
 //ILDE reader NEW
 import reader "../src/reader";
 
-actor class reader_reader(ledger_pid : Principal) = Self {
+actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = Self {
 
     // -- Ledger configuration
 
@@ -68,6 +68,140 @@ actor class reader_reader(ledger_pid : Principal) = Self {
         // ILDE---> how are the blocks I am generating?
         // #Map([["phash",phash],["ts",ts],["btype",btype],["tx",tx]])
 
+        //Debug.print("Block in decodeBlock:"#debug_show(block));
+        //Debug.print("\n---------------\n");
+        
+        // ?(#Map([("phash", #Blob("\38...")),   // phash is not there in the first block!
+        //         ("ts", #Nat(0)), 
+        //         ("btype", #Text("1mint")), 
+        //         ("tx", #Map([("created_at_time", #Nat(0)), 
+        //                      ("memo", #Blob("\30")), 
+        //                      ("caller", #Blob("\58...")), 
+        //                      ("fee", #Nat(0)), 
+        //                      ("payload", #Map([("amt", #Nat(50)), 
+        //                                        ("to", #Array([#Blob("\82...")]))]))]))]))
+        
+        // let from_subaccount_blob = if(p.from.size() > 1) p.from[1] else Blob.fromArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]);
+        // let from_principal_principal = Principal.fromBlob(from_principal_blob);
+        // let from_bacc = Principal.toLedgerAccount(from_principal_principal, ?from_subaccount_blob) 
+        //    else return #Err(#GenericError({ message = "Invalid From Subaccount"; error_code = 1111 }));
+              
+        
+        
+        var phash: Blob = "0";
+        var ts: Nat = 0;
+        var btype: Text = "";
+        var created_at_time: Nat = 0;
+        var memo: Blob = "0";
+        var caller: Blob = "0";
+        var fee: Nat = 0;
+        var amt: Nat = 0;
+        var to: [Blob] = ["0"];
+        var from: [Blob] = ["0"];
+        
+        switch(block) {
+            case (?(#Map(data))) {
+                for (x in data.vals()) {
+                    switch(x) {
+                        case(("phash", #Blob(myblob))) {
+                            phash := myblob;
+                        };
+                        case(("ts", #Nat(mynat))) {
+                            ts := mynat;
+                        };
+                        case(("btype", #Text(mytext))) {
+                            btype := mytext;
+                        };
+                        case(("tx", #Map(mymap))) {
+                            Debug.print("tx");
+                            Debug.print(debug_show(mymap));
+                            for (y in mymap.vals()) {
+                                switch(y) {
+                                    case(("created_at_time", #Nat(mynat))) {
+                                        created_at_time := mynat;
+                                    }; 
+                                    case(("memo", #Blob(myblob))) {
+                                        memo := myblob;
+                                    };
+                                    case(("caller", #Blob(myblob))) {
+                                        caller := myblob;
+                                    };
+                                    case(("fee", #Nat(mynat))) {
+                                        fee := mynat;
+                                    }; 
+                                    case(("payload", #Map(mymap))) {
+                                        for (z in mymap.vals()) {
+                                            switch(z) {
+                                                case(("amt", #Nat(mynat))) {
+                                                    amt := mynat;
+                                                };
+                                                case(("to", #Array(myarray))) {
+                                                    let aux0 = myarray[0];
+                                                    let aux1 = if(myarray.size() > 1) myarray[1] else #Blob(Blob.fromArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]));
+                                                    switch((aux0,aux1)) {
+                                                        case((#Blob(myblob0),#Blob(myblob1))) {
+                                                            let aux_array: [Blob] = [myblob0, myblob1];
+                                                            to := aux_array;
+                                                        };
+                                                        case(_){
+                                                            Debug.trap("Invalid block cannot be decoded");
+                                                        }
+                                                    };
+                                                };
+                                                case(("from", #Array(myarray))) {
+                                                    let aux0 = myarray[0];
+                                                    let aux1 = if(myarray.size() > 1) myarray[1] else #Blob(Blob.fromArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]));
+                                                    switch((aux0,aux1)) {
+                                                        case((#Blob(myblob0),#Blob(myblob1))) {
+                                                            let aux_array: [Blob] = [myblob0, myblob1];
+                                                            from := aux_array;
+                                                        };
+                                                        case(_){
+                                                            Debug.trap("Invalid block cannot be decoded");
+                                                        }
+                                                    };
+                                                };
+                                                case(_) {
+                                                };
+                                            };
+                                        };
+                                    };
+                                    case(_) {
+                                    };
+                                };
+                            };
+
+                        };
+                        case(_) {
+                            Debug.trap("Invalid block cannot be decoded");
+                        }
+                    }
+                };
+            };
+            case (_) {
+                Debug.trap("Invalid block cannot be decoded");
+            };
+        };
+
+        // Debug.print("phash");
+        // Debug.print(debug_show(phash));
+        // Debug.print("ts");
+        // Debug.print(debug_show(ts));
+        // Debug.print("btype");
+        // Debug.print(debug_show(btype));
+        // Debug.print("created_at_time");
+        // Debug.print(debug_show(created_at_time));
+        // Debug.print("memo");
+        // Debug.print(debug_show(memo));
+        // Debug.print("caller");
+        // Debug.print(debug_show(caller));
+        // Debug.print("fee");
+        // Debug.print(debug_show(fee));
+        // Debug.print("to");
+        // Debug.print(debug_show(to));
+        // Debug.print("from");
+        // Debug.print(debug_show(from));
+
         //BTB let's return a dummy action
         //     public type Action = {
         //     ts: Nat64;
@@ -97,17 +231,54 @@ actor class reader_reader(ledger_pid : Principal) = Self {
         //     };
         // };
 
-        let dummy_action: T.Action = {
-            ts = 0;
-            created_at_time = ?0;
-            memo = null;//Blob("0");
-            caller = Principal.fromText("kxegj-ch6jp-46fed-oamn7-3t2xz-kquy4-qqicu-hprmr-yo7zi-j6adw-7ae");
-            fee = ?0;
-            payload = #mint({to=[Principal.toBlob(Principal.fromText("kxegj-ch6jp-46fed-oamn7-3t2xz-kquy4-qqicu-hprmr-yo7zi-j6adw-7ae"))];
-                             amt=100;});
+        let return_action: T.Action = {
+            ts = Nat64.fromNat(ts);
+            created_at_time = ?Nat64.fromNat(created_at_time);
+            memo = ?memo;//Blob("0");
+            caller = Principal.fromBlob(caller);//(Principal.fromText("kxegj-ch6jp-46fed-oamn7-3t2xz-kquy4-qqicu-hprmr-yo7zi-j6adw-7ae");
+            fee = ?fee;
+            payload = switch(btype) {
+                // case (#burn(_)) "1burn";
+                // case (#transfer(_)) "1xfer";
+                // case (#mint(_)) "1mint";
+                // case (#transfer_from(_)) "2xfer";
+                case("1burn"){
+                    #burn({
+                        amt=amt;
+                        from=from;
+                      }
+                    );
+                };
+                case("1xfer"){
+                    #transfer({
+                        amt=amt;
+                        from=from;
+                        to=to;
+                      }
+                    );
+                };
+                case("1mint"){
+                    #mint({
+                        amt=amt;
+                        to=to;
+                      }
+                    );
+                };
+                case("2xfer"){
+                    #transfer_from({
+                        amt=amt;
+                        from=from;
+                        to=to;
+                      }
+                    );
+                };
+                case(_) Debug.trap("Invalid block cannot be decoded");
             };
+        };
 
-        dummy_action;
+        //Debug.print(debug_show(return_action));
+
+        return_action;
     };
 
     func getTimeFromAction(action: T.Action) : Nat64 {
@@ -116,7 +287,7 @@ actor class reader_reader(ledger_pid : Principal) = Self {
 
     func onRead(actions: [T.Action]) {
         Debug.print("onRead:");
-        Debug.print(debug_show(actions));
+        Debug.print("actions.size:"#debug_show(actions.size()));
     };
 
     func onError(error_text: Text) {   //ILDE: TBD: use SysLog
