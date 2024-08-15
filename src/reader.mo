@@ -110,7 +110,7 @@ module {
                 Debug.print(debug_show(rez.archived_blocks.size()));
                 Debug.print(debug_show(sorted_blocks.size()));
                 Debug.print(debug_show(decoded_actions.size()));
-                onRead(decoded_actions);//rez.blocks);//transactions);
+                await onRead(decoded_actions);//rez.blocks);//transactions);
                 
                 mem.last_indexed_tx += rez.blocks.size();//transactions.size();
                 if (rez.blocks.size() < 1000) {//transactions.size() < 1000) {
@@ -180,7 +180,7 @@ module {
                     Debug.print("before onRead 2");
                     Debug.print(debug_show(sorted_blocks.size()));
                     Debug.print(debug_show(decoded_actions.size()));
-                    onRead(decoded_actions);//rez.blocks);//transactions);
+                    await onRead(decoded_actions);//rez.blocks);//transactions);
 
                     mem.last_indexed_tx += u.transactions.size();
                     //rez.blocks.size();//transactions.size();
@@ -197,7 +197,7 @@ module {
                     Debug.print("before onRead 3");
                     Debug.print(debug_show(sorted_blocks.size()));
                     Debug.print(debug_show(decoded_actions.size()));
-                    onRead(decoded_actions);//rez.blocks);//transactions);
+                    await onRead(decoded_actions);//rez.blocks);//transactions);
                     //onRead(rez.transactions);
                     mem.last_indexed_tx += rez.blocks.size();
                 };

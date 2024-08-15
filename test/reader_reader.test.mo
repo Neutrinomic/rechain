@@ -285,9 +285,10 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
         action.ts;
     };
 
-    func onRead(actions: [T.Action]): async () {
+    func myOnRead(actions: [T.Action]): async () {
         Debug.print("onRead:");
         Debug.print("actions.size:"#debug_show(actions.size()));
+        let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;
         for(action in actions.vals()) {
             let err = await noarchive.add_record(action);
         };
@@ -313,12 +314,12 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
         // id(i) means start from i, last means start from the last block (basically show nothing but n ew blocks)
         onError = onError; // If error occurs during following and processing it will return the error
         onCycleEnd = onCycleEnd; // Measure performance of following and processing transactions. Returns instruction count
-        onRead = onRead;
+        onRead = myOnRead;
         decodeBlock = decodeBlock;       //ILDE:Block -> ?Block for convenience in conversions
         getTimeFromAction = getTimeFromAction;
     });
     
-    let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;
+    //let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;
 
     ignore Timer.setTimer<system>(#seconds 0, func () : async () {
         Debug.print("inside setTimer of reader");

@@ -306,6 +306,9 @@ describe("reader", () => {
     //do some waiting
     await passTime(10);
 
+    let r_balance2 = await can_noarchive.icrc1_balance_of(my_account);
+    console.log("John0 balance on noarchive: ", r_balance2);
+
     // i = 0n;
     // for (; i < 100; i++) {
     //   let r = await can_ledger.add_record(my_mint_action);
@@ -318,7 +321,7 @@ describe("reader", () => {
     // can_ledger.print_ledger();  
 
 
-    expect(true).toBe(true);
+    expect(r_balance).toBe(r_balance2);
 
     // let r_balance2 = await can_ledger.icrc1_balance_of(my_account);
     // console.log("John0 balance: ", r_balance2);
