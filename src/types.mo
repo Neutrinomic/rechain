@@ -139,7 +139,10 @@ module {
         hash_tree : Blob;
     };
 
+
+
     public type ArchiveInterface = actor {
+
       /// Appends the given transactions to the archive.
       /// > Only the Ledger canister is allowed to call this method
       append_transactions : shared ([Transaction]) -> async AddTransactionsResponse;

@@ -177,16 +177,16 @@ actor Self {//KeyValue(phonebook : Nat){
     //     //chain.set_ledger_canister(Principal.fromActor(this));
     // };
 
-    // public shared(msg) func add_record(x: T.Action): async (DispatchResult) {
-    //     //return icrc3().add_record<system>(x, null);
+    public shared(msg) func add_record(x: T.Action): async (DispatchResult) {
+        //return icrc3().add_record<system>(x, null);
 
-    //     let ret = chain.dispatch(x);  //handle error
-    //     //add block to ledger
+        let ret = chain.dispatch(x);  //handle error
+        //add block to ledger
 
-    //     return ret;
+        return ret;
 
 
-    // };
+    };
 
     public query func icrc1_balance_of(acc: ICRC.Account) : async Nat {
         balances.get(acc)

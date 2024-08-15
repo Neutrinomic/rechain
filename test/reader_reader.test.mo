@@ -285,9 +285,12 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
         action.ts;
     };
 
-    func onRead(actions: [T.Action]) {
+    func onRead(actions: [T.Action]): async () {
         Debug.print("onRead:");
         Debug.print("actions.size:"#debug_show(actions.size()));
+        for(action in actions.vals()) {
+            let err = await noarchive.add_record(action);
+        };
     };
 
     func onError(error_text: Text) {   //ILDE: TBD: use SysLog
@@ -303,6 +306,7 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
     stable let reader_mem = reader.Mem();
     var my_reader = reader.Reader<T.Action>({
         mem = reader_mem;
+        //noarchive_id = noarchive_pid;
         ledger_id = ledger_pid;
         start_from_block = #id(0);//last; 
         // ILDE: I DONT FULLY GET THIS ONE:   {#id:Nat; #last};
@@ -314,6 +318,8 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
         getTimeFromAction = getTimeFromAction;
     });
     
+    let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;
+
     ignore Timer.setTimer<system>(#seconds 0, func () : async () {
         Debug.print("inside setTimer of reader");
         Debug.print("ledger pid from insider reader:"#debug_show(ledger_pid));

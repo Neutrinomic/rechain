@@ -13,6 +13,7 @@ import Time "mo:base/Time";
 import Int "mo:base/Int";
 
 import T "./types";
+import TLedger "../test/ledger/types"
 
 // From https://github.com/Neutrinomic/devefi_icrc_ledger/tree/master
 module {
@@ -49,18 +50,24 @@ module {
     // Problems:
     // - make it use ICRC3 methods
     // - you get Generic Value Blocks, need to be converted with decodeBlock then passed to onRead
+
+
     public class Reader<A>({
         mem : Mem;
+        //noarchive_id : Principal;
         ledger_id : Principal;
         start_from_block: {#id:Nat; #last};
         onError : (Text) -> (); // If error occurs during following and processing it will return the error
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
-        onRead : [A] -> ();
-        decodeBlock : (?Block) -> A;       //ILDE:Block -> ?Block for convenience in conversions
+        onRead : [A] -> async ();
+        decodeBlock : (?Block) -> A;       //ILDE:Block 
         getTimeFromAction : A -> Nat64;    //ILDE:added
     }) {
         var started = false;
-        let ledger = actor (Principal.toText(ledger_id)) : T.ICRC3Interface;//Ledger.Self;//<<<----IMHERE I need the interface
+        let ledger = actor (Principal.toText(ledger_id)) : T.ICRC3Interface; 
+        // let noarchive = actor (Principal.toText(noarchive_id)) : TLedger.NoArchiveInterface; //ILDE: Ideally, this interface should be passed as parameter
+        //                                                                                      //     problems is "Action" and "ActionError" belong to "test/types.mo"
+        //                                                                                      //     idea: pass E to Reader and define interface here (TBD) 
         var lastTxTime : Nat64 = 0;
 
         private func cycle() : async () {
