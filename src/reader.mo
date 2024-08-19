@@ -13,7 +13,8 @@ import Time "mo:base/Time";
 import Int "mo:base/Int";
 
 import T "./types";
-import TLedger "../test/ledger/types"
+import TLedger "../test/ledger/types";
+import List "mo:base/List";
 
 // From https://github.com/Neutrinomic/devefi_icrc_ledger/tree/master
 module {
@@ -60,6 +61,7 @@ module {
         onError : (Text) -> (); // If error occurs during following and processing it will return the error
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
         onRead : [A] -> async ();
+        onReadNew : ([A], Nat) -> async ();  //ILDE: I am not sure what this new paramter is meant for (why do we pass 'mem.last_indexed_tx'?)
         decodeBlock : (?Block) -> A;       //ILDE:Block 
         getTimeFromAction : A -> Nat64;    //ILDE:added
     }) {
@@ -69,6 +71,112 @@ module {
         //                                                                                      //     problems is "Action" and "ActionError" belong to "test/types.mo"
         //                                                                                      //     idea: pass E to Reader and define interface here (TBD) 
         var lastTxTime : Nat64 = 0;
+        let maxTransactionsInCall:Nat = 2000;
+        
+        private func cycleNew() : async Bool {
+            if (not started) return false;
+            let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
+
+            if (mem.last_indexed_tx == 0) { // ILDE: last_indexed_tx: keeps the index of the block that is next to be read (not yet read)
+                switch(start_from_block) {  // ILDE: start_from_block (#id(id) or #last): #last means 
+                    case (#id(id)) {
+                        mem.last_indexed_tx := id;
+                    };
+                    case (#last) {
+                        let rez = await ledger.icrc3_get_blocks([{//get_transactions({
+                            start = 0;
+                            length = 0;
+                        }]);
+                        mem.last_indexed_tx := rez.log_length -1; // ILDE: it assigns last_indexed_t to the last block index in the ledger (start reading from the last)
+                    };
+                };
+            };
+
+            let rez = await ledger.icrc3_get_blocks([{//get_transactions({
+                start = mem.last_indexed_tx;
+                length = maxTransactionsInCall * 40; //ILDE: new constant 2000*40 (before 1000)
+            }]);
+            //NEWILDE
+            let quick_cycle:Bool = if (rez.log_length > mem.last_indexed_tx + 1000) true else false; // ILDE: flag returned by cycle: true if we are reading at least 1000 blocks in this cycle
+
+            if (rez.archived_blocks.size() == 0) { //rez.archived_transactions.size() == 0) { //ILDE: case not reading from archive canisters in this cycle
+                let sorted_blocks = sortBlocksById(rez.blocks);
+                let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
+   
+                await onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);
+                
+                mem.last_indexed_tx += rez.blocks.size();//transactions.size();
+
+                if (rez.blocks.size() != 0) lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
+                                                          //INSTEAD OF rez.transactions[rez.transactions.size() - 1].timestamp;
+
+            } else { //ILDE: case where we need to access archive canisters
+                // We need to collect transactions from archive and get them in order
+
+                // type myBlocksUnorderedtype = {
+                //     start : Nat;
+                //     transactions : [{block : ?Block; id : Nat}];
+                // };
+                type TransactionUnordered = {
+                    start : Nat;
+                    transactions : [Block];
+                };
+                type GetBlocksRequest = { 
+                    start : Nat; 
+                    length : Nat; 
+                };
+                type TransactionRange = { transactions : [Block] };
+
+                type myBlocksUnorderedtype = {
+                    start : Nat;
+                    transactions : [{block : ?Block; id : Nat}];
+                };
+
+                //ILDE let unordered = Vector.new<BlocksUnordered>(); // Probably a better idea would be to use a large enough var array
+                let unordered = Vector.new<myBlocksUnorderedtype>(); 
+
+                //ILDE
+                for (atx in rez.archived_blocks.vals()) {
+                    let txresp = await atx.callback(atx.args);                   
+                    Vector.add(
+                        unordered,
+                        {
+                            start = atx.args[0].start;
+                            transactions = txresp.blocks;
+                        },
+                    );
+                };
+                
+                let unordered_array = Vector.toArray<myBlocksUnorderedtype>(unordered);
+                let sorted = Array.sort<myBlocksUnorderedtype>(unordered_array, func(a, b) = Nat.compare(a.start, b.start));
+                
+                for (u in sorted.vals()) {
+                    assert (u.start == mem.last_indexed_tx); // is that necessary?
+
+                    let sorted_blocks = sortBlocksById(u.transactions);//blocks);
+                    let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
+
+                    await onRead(decoded_actions);//rez.blocks);//transactions);
+
+                    mem.last_indexed_tx += u.transactions.size();
+                };
+
+                if (rez.blocks.size() != 0) {
+                    let sorted_blocks = sortBlocksById(rez.blocks);
+                    let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
+                    await onRead(decoded_actions);//rez.blocks);//transactions);
+                    //onRead(rez.transactions);
+                    mem.last_indexed_tx += rez.blocks.size();
+                };                   
+
+            };
+
+            let inst_end = Prim.performanceCounter(1); // 1 is preserving with async
+            onCycleEnd(inst_end - inst_start);
+
+            quick_cycle;
+
+        };
 
         private func cycle() : async () {
             Debug.print("in cycle()");
