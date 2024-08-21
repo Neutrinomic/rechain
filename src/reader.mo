@@ -131,22 +131,56 @@ module {
                     start : Nat;
                     transactions : [{block : ?Block; id : Nat}];
                 };
-
+                
                 //ILDE let unordered = Vector.new<BlocksUnordered>(); // Probably a better idea would be to use a large enough var array
                 let unordered = Vector.new<myBlocksUnorderedtype>(); 
 
-                //ILDE
+                //ILDE: extend args such that all blocks are of size maxTransactionsInCall or smaller
+                //ILDE: new
+                
+                let maxTransactionsInCall:Nat = 2000;
+                let args_maxsize_ext = Vector.new<[GetBlocksRequest]>();
                 for (atx in rez.archived_blocks.vals()) {
-                    let txresp = await atx.callback(atx.args);                   
+                    let args = atx.args;
+                    let args_maxsize = Vector.new<[GetBlocksRequest]>();
+                    for (arg in args.vals()) {
+                        let arg_starts = Array.tabulate<Nat>(Nat.min(40, 1 + arg.length/maxTransactionsInCall), func(i) = arg.start + i*maxTransactionsInCall);
+                        let arg_starts_bound = Array.map<Nat, GetBlocksRequest>( arg_starts, func(i) = {start = i; length = if (i - arg.start:Nat+maxTransactionsInCall <= arg.length) maxTransactionsInCall else arg.length + arg.start - i } );
+                        Vector.add(args_maxsize, arg_starts_bound,);
+                        
+                    };
+                    let arg_ext : [[GetBlocksRequest]] = Vector.toArray(args_maxsize);
+                    let arg_ext_flat : [GetBlocksRequest] = Array.flatten(arg_ext);
+                    Vector.add(args_maxsize_ext, arg_ext_flat,);
+                };
+                let args_ext : [[GetBlocksRequest]] = Vector.toArray(args_maxsize_ext);
+
+                // ILDE: <-----IMHERE
+                // 0) check cycle on reader to know how is this different than the following 2 points
+                // 1Ilde) get the "unordered" by parallelizing access to archives
+                // 2Ilde) do all steps sort per blockid, convert to actions, and push to onRead method 
+
+
+                for (atx in rez.archived_blocks.vals()) {
+                    let txresp = await atx.callback(atx.args);
+                    // start--->starts:[{start,length}] ---->compute expected length of blocks to be receiverd (auxl)                   
                     Vector.add(
                         unordered,
                         {
                             start = atx.args[0].start;
                             transactions = txresp.blocks;
+                            // check that transactions.size() == auxl
+                            
                         },
                     );
                 };
-                
+                //1) reuse the following code to partition "starts" 
+                // I need let maxTransactionsInCall:Nat = 2000;
+                //let args_starts = Array.tabulate<Nat>(Nat.min(40, 1 + atx.length/maxTransactionsInCall), func(i) = atx.start + i*maxTransactionsInCall);
+                //let args = Array.map<Nat, Ledger.GetBlocksRequest>( args_starts, func(i) = {start = i; length = if (i - atx.start:Nat+maxTransactionsInCall <= atx.length) maxTransactionsInCall else atx.length + atx.start - i } );
+
+                //ILDE: which call the questions: what if blockids in archive 1 < blockids in  archive 2. The standard doesnot say this is impossible  
+
                 let unordered_array = Vector.toArray<myBlocksUnorderedtype>(unordered);
                 let sorted = Array.sort<myBlocksUnorderedtype>(unordered_array, func(a, b) = Nat.compare(a.start, b.start));
                 
