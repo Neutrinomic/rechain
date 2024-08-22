@@ -119,7 +119,7 @@ module {
                 // };
                 type TransactionUnordered = {
                     start : Nat;
-                    transactions : [Block];
+                    transactions : [?Block];
                 };
                 type GetBlocksRequest = { 
                     start : Nat; 
@@ -138,8 +138,8 @@ module {
                 //ILDE: extend args such that all blocks are of size maxTransactionsInCall or smaller
                 //ILDE: new
                 
-                let maxTransactionsInCall:Nat = 2000;
                 let args_maxsize_ext = Vector.new<[GetBlocksRequest]>();
+                let args_starts = Vector.new<[Nat]>();
                 for (atx in rez.archived_blocks.vals()) {
                     let args = atx.args;
                     let args_maxsize = Vector.new<[GetBlocksRequest]>();
@@ -156,60 +156,120 @@ module {
                 let args_ext : [[GetBlocksRequest]] = Vector.toArray(args_maxsize_ext);
 
                 // ILDE: <-----IMHERE
-                // 0) check cycle on reader to know how is this different than the following 2 points
+                // 0) check cycle on reader to know how is this different than the following 2 points ----> basicallythe same ---> just copy from new algo
                 // 1Ilde) get the "unordered" by parallelizing access to archives
                 // 2Ilde) do all steps sort per blockid, convert to actions, and push to onRead method 
 
-
+                var buf = List.nil<async T.GetTransactionsResult>();
+                var data = List.nil<T.GetTransactionsResult>();//TransactionRange>();
+                var i = 0;
                 for (atx in rez.archived_blocks.vals()) {
-                    let txresp = await atx.callback(atx.args);
-                    // start--->starts:[{start,length}] ---->compute expected length of blocks to be receiverd (auxl)                   
-                    Vector.add(
-                        unordered,
-                        {
-                            start = atx.args[0].start;
-                            transactions = txresp.blocks;
-                            // check that transactions.size() == auxl
+                    // The calls are sent here without awaiting anything
+                    let promise = atx.callback(args_ext[i]);   
+                    buf := List.push(promise, buf); 
+                };
+                // type GetTransactionsResult = {
+                //     log_length : Nat;        
+                //     blocks : [{ id : Nat; block : ?Value }];
+                //     archived_blocks : [ArchivedTransactionResponse];
+                // };
+                // type TransactionRange = { transactions : [Block] };
+
+                for (promise in List.toIter(buf)) {
+                  // Await results of all promises. We recieve them in sequential order
+                   data := List.push(await promise, data);
+                };
+                let chunks : [T.GetTransactionsResult] = List.toArray(data); // I: note the type allows to identify the id of every block
+
+                //I: copied from devefi and adapted (look at comments with I)
+                var chunk_idx = 0;
+                for (chunk in chunks.vals()) {
+                    if (chunk.blocks.size() > 0) { // I: transactions -> blocks
+                        // If chunks (except the last one) are smaller than 2000 tx then implementation is strange
+                        if ((chunk_idx < (chunks.size() - 1:Nat)) and (chunk.blocks.size() != maxTransactionsInCall)) {  //I: args.size() -> chunks.size()
+
+                            onError("chunk.blocks.size() != " # Nat.toText(maxTransactionsInCall) # " | chunk.blocks.size(): " # Nat.toText(chunk.blocks.size())); //I: transactions -> blocks
                             
-                        },
-                    );
+                            return false;
+                        };
+                        Vector.add(
+                            unordered,
+                            {
+                                start = chunk.blocks[0].id; //args_starts[chunk_idx] -> blocks[0].id
+                                transactions = chunk.blocks; //transactions -> blocks;
+                            },
+                        );
+                    };
+                    chunk_idx += 1;
                 };
-                //1) reuse the following code to partition "starts" 
-                // I need let maxTransactionsInCall:Nat = 2000;
-                //let args_starts = Array.tabulate<Nat>(Nat.min(40, 1 + atx.length/maxTransactionsInCall), func(i) = atx.start + i*maxTransactionsInCall);
-                //let args = Array.map<Nat, Ledger.GetBlocksRequest>( args_starts, func(i) = {start = i; length = if (i - atx.start:Nat+maxTransactionsInCall <= atx.length) maxTransactionsInCall else atx.length + atx.start - i } );
 
-                //ILDE: which call the questions: what if blockids in archive 1 < blockids in  archive 2. The standard doesnot say this is impossible  
-
-                let unordered_array = Vector.toArray<myBlocksUnorderedtype>(unordered);
-                let sorted = Array.sort<myBlocksUnorderedtype>(unordered_array, func(a, b) = Nat.compare(a.start, b.start));
+                //I: we need to transform from "myBlocksUnorderedtype" to "TransactionUnordered" (required by the new algorithm)
+                // type myBlocksUnorderedtype = {
+                //     start : Nat;
+                //     transactions : [{block : ?Block; id : Nat}];
+                // };
+                // type TransactionUnordered = {
+                //     start : Nat;
+                //     transactions : [?Block];
+                // };
                 
-                for (u in sorted.vals()) {
-                    assert (u.start == mem.last_indexed_tx); // is that necessary?
-
-                    let sorted_blocks = sortBlocksById(u.transactions);//blocks);
-                    let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
-
-                    await onRead(decoded_actions);//rez.blocks);//transactions);
-
-                    mem.last_indexed_tx += u.transactions.size();
+                //NEW
+                let tx_unordered = Vector.new<TransactionUnordered>();
+                let unordered_array : [myBlocksUnorderedtype] = Vector.toArray(unordered);
+                for (tx in unordered_array.vals()) {
+                    let aux = tx.transactions;
+                    let aux_tx : [?Block] = Array.tabulate<?Block>(aux.size(), func i = aux[i].block);
+                    Vector.add(tx_unordered, {start = tx.start; transactions=aux_tx},);
                 };
+                //ENDNEW
 
-                if (rez.blocks.size() != 0) {
+                let sorted = Array.sort<myBlocksUnorderedtype>(Vector.toArray(unordered), func(a, b) = Nat.compare(a.start, b.start));
+
+                for (u in sorted.vals()) {
+                    if (u.start != mem.last_indexed_tx) {
+                        onError("u.start != mem.last_indexed_tx | u.start: " # Nat.toText(u.start) # " mem.last_indexed_tx: " # Nat.toText(mem.last_indexed_tx) # " u.transactions.size(): " # Nat.toText(u.transactions.size()));
+                        return false;
+                    };
+                    //BEFORE onRead(u.transactions, mem.last_indexed_tx);
+                    //NEW
+                    let sorted_blocks = sortBlocksById(u.transactions);
+                    let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
+                    await onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);
+                    //ENDNEW                    
+                    mem.last_indexed_tx += u.transactions.size();
+                    //BEFORE if (u.blocks.size() != 0) lastTxTime := u.transactions[u.transactions.size() - 1].timestamp;
+                    //NEW
+                    if (u.transactions.size() != 0) lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
+                    //ENDNEW
+                };   
+
+                //I: in our case, rez.first_index does not exist, so I comment the whole internal if
+                if (rez.blocks.size() != 0) { //I: transactions -> blocks
+                    // if (rez.first_index != mem.last_indexed_tx) {
+                    //     onError("rez.first_index !== mem.last_indexed_tx | rez.first_index: " # Nat.toText(rez.first_index) # " mem.last_indexed_tx: " # Nat.toText(mem.last_indexed_tx) # " rez.transactions.size(): " # Nat.toText(rez.transactions.size()));
+                    //     return false;
+                    // };
+
+                    //BEFORE onRead(rez.transactions, mem.last_indexed_tx);
+                    //NEW
                     let sorted_blocks = sortBlocksById(rez.blocks);
                     let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
-                    await onRead(decoded_actions);//rez.blocks);//transactions);
-                    //onRead(rez.transactions);
-                    mem.last_indexed_tx += rez.blocks.size();
-                };                   
+                    await onReadNew(decoded_actions, mem.last_indexed_tx);
+                    //ENDNEW
 
+                    //BEFORE mem.last_indexed_tx += rez.transactions.size();
+                    //BEFORE lastTxTime := rez.transactions[rez.transactions.size() - 1].timestamp;
+                    //NEW
+                    mem.last_indexed_tx += rez.blocks.size();//transactions.size();
+                    if (rez.blocks.size() != 0) lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
+                    //ENDNEW
+                };
             };
 
             let inst_end = Prim.performanceCounter(1); // 1 is preserving with async
             onCycleEnd(inst_end - inst_start);
 
             quick_cycle;
-
         };
 
         private func cycle() : async () {
