@@ -286,12 +286,16 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
     };
 
     func myOnRead(actions: [T.Action]): async () {
-        Debug.print("onRead:");
-        Debug.print("actions.size:"#debug_show(actions.size()));
+        // Debug.print("onRead:");
+        // Debug.print("actions.size:"#debug_show(actions.size()));
         let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;
         for(action in actions.vals()) {
             let err = await noarchive.add_record(action);
         };
+    };
+
+    func myOnReadNew(actions: [T.Action], id_nat : Nat): async () {
+        await myOnRead(actions);
     };
 
     func onError(error_text: Text) {   //ILDE: TBD: use SysLog
@@ -305,6 +309,33 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
     };
 
     stable let reader_mem = reader.Mem();
+
+    // public class Reader<A>({
+    //     mem : Mem;
+    //     //noarchive_id : Principal;
+    //     ledger_id : Principal;
+    //     start_from_block: {#id:Nat; #last};
+    //     onError : (Text) -> (); // If error occurs during following and processing it will return the error
+    //     onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
+    //     onRead : [A] -> async ();
+    //     onReadNew : ([A], Nat) -> async ();  //ILDE: I am not sure what this new paramter is meant for (why do we pass 'mem.last_indexed_tx'?)
+    //     decodeBlock : (?Block) -> A;       //ILDE:Block 
+    //     getTimeFromAction : A -> Nat64;    //ILDE:added
+    // })
+    
+    // public class Reader<A>({
+    //     mem : Mem;
+    //     //noarchive_id : Principal;
+    //     ledger_id : Principal;
+    //     start_from_block: {#id:Nat; #last};
+    //     onError : (Text) -> (); // If error occurs during following and processing it will return the error
+    //     onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
+    //     onRead : [A] -> async ();
+    //     onReadNew : ([A], Nat) -> async ();  //ILDE: I am not sure what this new paramter is meant for (why do we pass 'mem.last_indexed_tx'?)
+    //     decodeBlock : (?Block) -> A;       //ILDE:Block 
+    //     getTimeFromAction : A -> Nat64;    //ILDE:added
+    // });
+
     var my_reader = reader.Reader<T.Action>({
         mem = reader_mem;
         //noarchive_id = noarchive_pid;
@@ -315,6 +346,7 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
         onError = onError; // If error occurs during following and processing it will return the error
         onCycleEnd = onCycleEnd; // Measure performance of following and processing transactions. Returns instruction count
         onRead = myOnRead;
+        onReadNew = myOnReadNew;
         decodeBlock = decodeBlock;       //ILDE:Block -> ?Block for convenience in conversions
         getTimeFromAction = getTimeFromAction;
     });

@@ -309,111 +309,43 @@ describe("reader", () => {
     let r_balance2 = await can_noarchive.icrc1_balance_of(my_account);
     console.log("John0 balance on noarchive: ", r_balance2);
 
-    // i = 0n;
-    // for (; i < 100; i++) {
-    //   let r = await can_ledger.add_record(my_mint_action);
-    // }
-
-    // await passTime(3);
-    
-    // console.log("end enabled");
-
-    // can_ledger.print_ledger();  
-
-
     expect(r_balance).toBe(r_balance2);
 
-    // let r_balance2 = await can_ledger.icrc1_balance_of(my_account);
-    // console.log("John0 balance: ", r_balance2);
-
-    // let r_mint2 = await can_ledger.add_record(my_mint_action);
-    // let r_mint3 = await can_ledger.add_record(my_mint_action);
-    
-    // let my_block_args: GetBlocksArgs = [
-    //   {start:0n,length:3n}, 
-    // ]
-
-    // let my_blocks:GetTransactionsResult = await can_ledger.icrc3_get_blocks(my_block_args);
-
-    // const decodedBlock0 = decodeBlock2(my_blocks,1); 
-    // const decodedBlock1 = decodeBlock2(my_blocks,1); 
-    // const decodedBlock2 = decodeBlock2(my_blocks,2); 
-
-    // const john0_to = john0.getPrincipal().toUint8Array();
-
-    // expect(true).toBe(JSON.stringify(john0_to) === JSON.stringify(decodedBlock1.payload_to));
-
-    // if (typeof decodedBlock1.auxm1 !== 'undefined') {
-    //   const auxm1 = decodedBlock1.auxm1;
-    //   const phash_hat1 = await can_ledger.compute_hash(auxm1);
-    //   expect(true).toBe(JSON.stringify(decodedBlock1.phash) === JSON.stringify(phash_hat1[0]));
-    // };
-
-    // if (typeof decodedBlock2.auxm1 !== 'undefined') {
-    //   const auxm2 = decodedBlock2.auxm1;
-    //   const phash_hat2 = await can_ledger.compute_hash(auxm2);
-    //   expect(true).toBe(JSON.stringify(decodedBlock2.phash) === JSON.stringify(phash_hat2[0]));
-    // };
-   
   },60000);
 
-  // it("check_archives_balance", async () => {
-       
+  it("several_accounts", async () => {
+    let my_mint_action: Action = {
+      ts : 0n,
+      created_at_time : [0n], //?Nat64
+      memo: [], //?Blob;
+      caller: jo.getPrincipal(),  
+      fee: [], //?Nat
+      payload : {
+          mint : {
+              amt : 50n,
+              to : [john1.getPrincipal().toUint8Array()],
+          },
+      },
+    };
     
-  //   let my_mint_action: Action = {
-  //     ts : 0n,
-  //     created_at_time : [0n], //?Nat64
-  //     memo: [], //?Blob;
-  //     caller: jo.getPrincipal(),  
-  //     fee: [], //?Nat
-  //     payload : {
-  //         mint : {
-  //             amt : 50n,
-  //             to : [john0.getPrincipal().toUint8Array()],
-  //         },
-  //     },
-  //   };
+    let i = 0n;
+    for (; i < 10; i++) {
+      let r = await can_ledger.add_record(my_mint_action);
+    }
 
-  //   let i = 0n;
-  //   for (; i < 35; i++) {
-  //     let r = await can.add_record(my_mint_action);
-  //     //console.log(i);
-  //   }
-  //   console.log(i);
-
-  //   await passTime(200);
-
-  //   i = 0n;
-  //   for (; i < 35; i++) {
-  //     let r = await can.add_record(my_mint_action);
-  //     //console.log(i);
-  //   }
-  //   console.log(i);
-
-  //   await passTime(200);
+    let account1 : Account = {'owner' : john1.getPrincipal(),
+      'subaccount' : []};
     
-  //   await can.check_archives_balance();
+    let r_balance = await can_ledger.icrc1_balance_of(account1);
+    console.log("John1 balance: ", r_balance);
     
-  //   await passTime(200);
+    expect(r_balance).toBe(500n);
 
-  //   i = 0n;
-  //   for (; i < 35; i++) {
-  //     let r = await can.add_record(my_mint_action);
-  //     //console.log(i);
-  //   }
-  //   console.log(i);
-    
-  //   await passTime(200);
-    
-  //   const ret = await can.check_archives_balance();
-    
-  //   console.log(ret);
+  },60000);
 
-  //   await passTime(200);
-
-  //   expect(true).toBe(true);
-   
-  // });
+  it("transfer", async () => {
+    //<--------
+  },60000);
 
   async function passTime(n: number) {
     for (let i = 0; i < n; i++) {
