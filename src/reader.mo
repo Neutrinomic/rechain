@@ -74,6 +74,8 @@ module {
         let maxTransactionsInCall:Nat = 2000;
         
         private func cycleNew() : async Bool {
+            Debug.print("CYCLENEW() <----------------------------");
+
             if (not started) return false;
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
 
@@ -97,26 +99,22 @@ module {
                 length = maxTransactionsInCall * 40; //ILDE: new constant 2000*40 (before 1000)
             }]);
             //NEWILDE
-            let quick_cycle:Bool = if (rez.log_length > mem.last_indexed_tx + 1000) true else false; // ILDE: flag returned by cycle: true if we are reading at least 1000 blocks in this cycle
+            let quick_cycle:Bool = if (rez.log_length > mem.last_indexed_tx + 1000) true else false; // ILDE: flag returned by cycle: true if we are reading at least 1000 blocks in this cycle. Not sure why it return it???
 
             if (rez.archived_blocks.size() == 0) { //rez.archived_transactions.size() == 0) { //ILDE: case not reading from archive canisters in this cycle
                 let sorted_blocks = sortBlocksById(rez.blocks);
                 let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
    
-                await onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);
+                await onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);//ILDE: NEW: not sure why we need to pass "last_index_tx"
                 
                 mem.last_indexed_tx += rez.blocks.size();//transactions.size();
 
                 if (rez.blocks.size() != 0) lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
-                                                          //INSTEAD OF rez.transactions[rez.transactions.size() - 1].timestamp;
+                                                          //ILDE: NEED TO DISCUSS: INSTEAD OF rez.transactions[rez.transactions.size() - 1].timestamp;
 
             } else { //ILDE: case where we need to access archive canisters
                 // We need to collect transactions from archive and get them in order
 
-                // type myBlocksUnorderedtype = {
-                //     start : Nat;
-                //     transactions : [{block : ?Block; id : Nat}];
-                // };
                 type TransactionUnordered = {
                     start : Nat;
                     transactions : [?Block];
@@ -139,26 +137,21 @@ module {
                 //ILDE: new
                 
                 let args_maxsize_ext = Vector.new<[GetBlocksRequest]>();
-                let args_starts = Vector.new<[Nat]>();
+                //let args_starts = Vector.new<[Nat]>();
                 for (atx in rez.archived_blocks.vals()) {
                     let args = atx.args;
                     let args_maxsize = Vector.new<[GetBlocksRequest]>();
                     for (arg in args.vals()) {
-                        let arg_starts = Array.tabulate<Nat>(Nat.min(40, 1 + arg.length/maxTransactionsInCall), func(i) = arg.start + i*maxTransactionsInCall);
+                        let arg_starts = Array.tabulate<Nat>(Nat.min(40, 1 + arg.length/maxTransactionsInCall), func(i) = arg.start + i*maxTransactionsInCall); //ILDE: THIS seems an overkill
+                        //ILDE: where is this 40 coming from???
                         let arg_starts_bound = Array.map<Nat, GetBlocksRequest>( arg_starts, func(i) = {start = i; length = if (i - arg.start:Nat+maxTransactionsInCall <= arg.length) maxTransactionsInCall else arg.length + arg.start - i } );
                         Vector.add(args_maxsize, arg_starts_bound,);
-                        
                     };
                     let arg_ext : [[GetBlocksRequest]] = Vector.toArray(args_maxsize);
                     let arg_ext_flat : [GetBlocksRequest] = Array.flatten(arg_ext);
                     Vector.add(args_maxsize_ext, arg_ext_flat,);
                 };
                 let args_ext : [[GetBlocksRequest]] = Vector.toArray(args_maxsize_ext);
-
-                // ILDE: <-----IMHERE
-                // 0) check cycle on reader to know how is this different than the following 2 points ----> basicallythe same ---> just copy from new algo
-                // 1Ilde) get the "unordered" by parallelizing access to archives
-                // 2Ilde) do all steps sort per blockid, convert to actions, and push to onRead method 
 
                 var buf = List.nil<async T.GetTransactionsResult>();
                 var data = List.nil<T.GetTransactionsResult>();//TransactionRange>();
@@ -168,20 +161,14 @@ module {
                     let promise = atx.callback(args_ext[i]);   
                     buf := List.push(promise, buf); 
                 };
-                // type GetTransactionsResult = {
-                //     log_length : Nat;        
-                //     blocks : [{ id : Nat; block : ?Value }];
-                //     archived_blocks : [ArchivedTransactionResponse];
-                // };
-                // type TransactionRange = { transactions : [Block] };
-
+                //I? Why is this faster? because we make all the call at once??
                 for (promise in List.toIter(buf)) {
                   // Await results of all promises. We recieve them in sequential order
                    data := List.push(await promise, data);
                 };
                 let chunks : [T.GetTransactionsResult] = List.toArray(data); // I: note the type allows to identify the id of every block
 
-                //I: copied from devefi and adapted (look at comments with I)
+                //I:<----- copied from devefi and adapted (look at comments with I)
                 var chunk_idx = 0;
                 for (chunk in chunks.vals()) {
                     if (chunk.blocks.size() > 0) { // I: transactions -> blocks
@@ -214,13 +201,13 @@ module {
                 // };
                 
                 //NEW
-                let tx_unordered = Vector.new<TransactionUnordered>();
-                let unordered_array : [myBlocksUnorderedtype] = Vector.toArray(unordered);
-                for (tx in unordered_array.vals()) {
-                    let aux = tx.transactions;
-                    let aux_tx : [?Block] = Array.tabulate<?Block>(aux.size(), func i = aux[i].block);
-                    Vector.add(tx_unordered, {start = tx.start; transactions=aux_tx},);
-                };
+                // let tx_unordered = Vector.new<TransactionUnordered>();
+                // let unordered_array : [myBlocksUnorderedtype] = Vector.toArray(unordered);
+                // for (tx in unordered_array.vals()) {
+                //     let aux = tx.transactions;
+                //     let aux_tx : [?Block] = Array.tabulate<?Block>(aux.size(), func i = aux[i].block);
+                //     Vector.add(tx_unordered, {start = tx.start; transactions=aux_tx},);
+                // };
                 //ENDNEW
 
                 let sorted = Array.sort<myBlocksUnorderedtype>(Vector.toArray(unordered), func(a, b) = Nat.compare(a.start, b.start));
@@ -418,7 +405,7 @@ module {
         private func cycle_shell() : async () {
             try {
                 // We need it async or it won't throw errors
-                await cycle();
+                let aux = await cycleNew();
             } catch (e) {
                 onError("cycle:" # Principal.toText(ledger_id) # ":" # Error.message(e));
             };
