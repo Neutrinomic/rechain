@@ -276,7 +276,7 @@ describe("reader", () => {
     await pic.tearDown(); //this means "it removes the replica"
   });
 
-  it("check_balance_in_reader", async () => {
+  it("check_balance_in_reader_after_mints", async () => {
     let my_mint_action: Action = {
       ts : 0n,
       created_at_time : [0n], //?Nat64
@@ -292,7 +292,7 @@ describe("reader", () => {
     };
     
     let i = 0n;
-    for (; i < 2; i++) {
+    for (; i < 500; i++) {
       let r = await can_ledger.add_record(my_mint_action);
     }
 
@@ -313,35 +313,79 @@ describe("reader", () => {
 
   },60000);
 
-  it("several_accounts", async () => {
-    let my_mint_action: Action = {
+  it("check_balance_in_reader_after_burns", async () => {
+    let my_burn_action: Action = {
       ts : 0n,
       created_at_time : [0n], //?Nat64
       memo: [], //?Blob;
       caller: jo.getPrincipal(),  
       fee: [], //?Nat
       payload : {
-          mint : {
+          burn : {
               amt : 50n,
-              to : [john1.getPrincipal().toUint8Array()],
+              from : [john0.getPrincipal().toUint8Array()],
           },
       },
     };
     
     let i = 0n;
-    for (; i < 10; i++) {
-      let r = await can_ledger.add_record(my_mint_action);
+    for (; i < 250; i++) {
+      let r = await can_ledger.add_record(my_burn_action);
     }
 
-    let account1 : Account = {'owner' : john1.getPrincipal(),
-      'subaccount' : []};
+    await passTime(10);
+    
+    let account1 : Account = {'owner' : john0.getPrincipal(),
+                              'subaccount' : []};
     
     let r_balance = await can_ledger.icrc1_balance_of(account1);
     console.log("John1 balance: ", r_balance);
     
-    expect(r_balance).toBe(500n);
+    expect(r_balance).toBe(12500n);
+
+    let r_balance2 = await can_noarchive.icrc1_balance_of(account1);
+    console.log("John0 balance on noarchive: ", r_balance2);
+
+    expect(r_balance).toBe(r_balance2);
 
   },60000);
+
+  it("check_balance_in_reader_after_transfers", async () => {
+    let my_transfer_action: Action = {
+      ts : 0n,
+      created_at_time : [0n], //?Nat64
+      memo: [], //?Blob;
+      caller: jo.getPrincipal(),  
+      fee: [], //?Nat
+      payload : {
+          transfer : {
+              amt : 50n,
+              from : [john0.getPrincipal().toUint8Array()],
+              to : [john1.getPrincipal().toUint8Array()],
+          },
+      },
+    };
+
+    let i = 0n;
+    for (; i < 200; i++) {
+      let r = await can_ledger.add_record(my_transfer_action);
+    }
+    
+    await passTime(10);
+
+    let account1 : Account = {'owner' : john1.getPrincipal(),
+      'subaccount' : []};
+
+    let r_balance = await can_ledger.icrc1_balance_of(account1);
+    console.log("John1 balance: ", r_balance);
+    
+    let r_balance2 = await can_noarchive.icrc1_balance_of(account1);
+    console.log("John1 balance on noarchive: ", r_balance2);
+    
+    expect(r_balance2).toBe(10000n);
+
+
+  },60000); 
 
   it("transfer", async () => {
     //<--------
