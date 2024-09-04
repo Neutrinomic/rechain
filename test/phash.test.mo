@@ -56,7 +56,7 @@ actor Self {
     stable let chain_mem = rechain.Mem();
 
 
-    func encodeBlock(b: T.Action) : [rechain.ValueMap] {
+    func encodeBlock(b: T.Action) : ?[rechain.ValueMap] {
 
         let created_at_time: Nat64 = switch (b.created_at_time) {
             case null 0;
@@ -70,7 +70,7 @@ actor Self {
             case null 0;
             case (?Nat) Nat;
         };
-        [
+        ?[
             ("ts", #Nat(Nat64.toNat(b.ts))),
 
             ("btype", #Text(switch (b.payload) {

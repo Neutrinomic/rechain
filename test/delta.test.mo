@@ -30,8 +30,8 @@ actor class Delta({archive_controllers: [Principal]}) = this {
 
     stable let chain_mem  = rechain.Mem();
 
-    func encodeBlock(b: Action): [rechain.ValueMap] {
-        [
+    func encodeBlock(b: Action): ?[rechain.ValueMap] {
+        ?[
             ("ts", #Nat(Nat64.toNat(b.ts))),
             ("btype", #Text(switch (b.payload) {
                     case (#swap(_)) "1swap";

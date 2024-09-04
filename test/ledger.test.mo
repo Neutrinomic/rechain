@@ -73,7 +73,7 @@ actor Self {
     // So to use Rechain, I think encodeBlock is just identity function, the hashblock is the standard
 
 
-    func encodeBlock(b: T.Action) : [rechain.ValueMap] {
+    func encodeBlock(b: T.Action) : ?[rechain.ValueMap] {
 
         let created_at_time: Nat64 = switch (b.created_at_time) {
             case null 0;
@@ -87,7 +87,7 @@ actor Self {
             case null 0;
             case (?Nat) Nat;
         };
-        [
+        ?[
             ("ts", #Nat(Nat64.toNat(b.ts))),
 
             ("btype", #Text(switch (b.payload) {

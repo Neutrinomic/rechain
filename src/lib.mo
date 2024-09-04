@@ -101,7 +101,7 @@ module {
 
   public class Chain<A, E>({
     mem : Mem;
-    encodeBlock : (A) -> [T.ValueMap];
+    encodeBlock : (A) -> ?[T.ValueMap];
     reducers : [ActionReducer<A, E>];
     settings : ?T.InitArgs;
   }) {
@@ -124,30 +124,48 @@ module {
       let hasError = Array.find<ReducerResponse<E>>(reducerResponse, func(resp) = switch (resp) { case (#Err(_)) true; case (_) false });
 
       switch (hasError) { case (? #Err(e)) { return #Err(e) }; case (_) () };
-      let blockId = mem.lastIndex + 1; //archiveState.history.end() + 1; // ILDE: now archiveState.lastIndex is the id of last block in the ledger
+      
+      let blockId = mem.lastIndex + 1; 
       // Execute state changes if no errors
       ignore Array.map<ReducerResponse<E>, ()>(reducerResponse, func(resp) { let #Ok(f) = resp else return (); f(blockId) });
 
+      let encodedBlock: ?[T.ValueMap] = encodeBlock(action); 
 
-      let encodedBlock = encodeBlock(action);
-      // create new empty block entry
-      let trx = Vec.new<T.ValueMap>();
-      // Add phash to empty block (null if not the first block)
-      ignore do ? {Vec.add(trx, ("phash", #Blob(mem.phash!)))};
+      switch (encodedBlock) {
+        case (null) {};
+        case (?aux) {
+          let encodedBlock_nonull: [T.ValueMap] = aux;
+          // create new empty block entry
+          let trx = Vec.new<T.ValueMap>();
+          // Add phash to empty block (null if not the first block)
+          ignore do ? {Vec.add(trx, ("phash", #Blob(mem.phash!)))};
+          // add encoded blockIlde to new block with phash
+          Vec.addFromIter(trx, encodedBlock_nonull.vals());
+          // covert vector to map to make it consistent with Value type
+          let thisTrx = #Map(Vec.toArray(trx));
+          mem.phash := ?Blob.fromArray(RepIndy.hash_val(thisTrx));
+          ignore history.add(thisTrx);
 
-      // add encoded blockIlde to new block with phash
-      Vec.addFromIter(trx, encodedBlock.vals());
-      // covert vector to map to make it consistent with Value type
-      let thisTrx = #Map(Vec.toArray(trx));
-      mem.phash := ?Blob.fromArray(RepIndy.hash_val(thisTrx));
-      ignore history.add(thisTrx);
-      //One we add the block, we need to increase the lastIndex
+           // certificate is computed using phash so, we only update the certificate if we update 
+        };
+      };
+
+      // // create new empty block entry
+      // let trx = Vec.new<T.ValueMap>();
+      // // Add phash to empty block (null if not the first block)
+      // ignore do ? {Vec.add(trx, ("phash", #Blob(mem.phash!)))};
+
+      // // add encoded blockIlde to new block with phash
+      // Vec.addFromIter(trx, encodedBlock.vals());
+      // // covert vector to map to make it consistent with Value type
+      // let thisTrx = #Map(Vec.toArray(trx));
+      // mem.phash := ?Blob.fromArray(RepIndy.hash_val(thisTrx));
+      // ignore history.add(thisTrx);
+      // //One we add the block, we need to increase the lastIndex
       mem.lastIndex := mem.lastIndex + 1;
 
-
-
+      // certificate is computed using phash and mem.lastIndex, so we ALWAYS update the certificate (at least mem.lastIndex changed) 
       dispatch_cert();
-
 
       #Ok(blockId);
     };
