@@ -21,11 +21,11 @@ This Motoko library serves as a middleware framework enabling the integration of
 
 **Examples:**
 
-Use case 1: How to add ledger functionalities to your dapps/canisters
+- **Use case 1:** How to add ledger functionalities to your dapps/canisters
 
 ![alt text](./simpleapp_withledger.jpg "Optional Title1")
 
-Use case 2: How to replicate the Dapp/canister state evolution up to a given time
+- **Use case 2:** How to replicate the Dapp/canister state evolution up to a given time
 
 ![alt text](./recreating_appstate.jpg "Optional Title2")
 
@@ -33,10 +33,9 @@ Examples of both cases can be found [here](https://github.com/Neutrinomic/rechai
 
 **Installation and test:**
 
-1) Make sure node is installed (version 21.4 or superior): `> nvm 21.4`
-```
-nvm 21.4
-go to test
-yarn
-built
-```
+1) Make sure node is installed (version 21.4 or superior): `>nvm 21.4`
+2) Move to the test director: `>cd test` 
+3) Install all typescript packages necessary to execute tests: `>yarn install`
+4) Install all required Mops Motoko packages: `>mops install` 
+5) Build Motoko test modules: `>./built.sh`
+6) Launch a test: `>npm run test:reader`
