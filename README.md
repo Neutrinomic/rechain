@@ -33,7 +33,7 @@ Examples of both cases can be found [here](https://github.com/Neutrinomic/rechai
 
 **Installation and test:**
 
-1) Make sure node is installed (version 21.4 or superior): `nvm 21.4' 
+1) Make sure node is installed (version 21.4 or superior): `> nvm 21.4`
 ```
 nvm 21.4
 go to test
