@@ -21,13 +21,19 @@ This Motoko library serves as a middleware framework enabling the integration of
 
 **Examples:**
 
+Use case 1: How to add ledger functionalities to your dapps/canisters
+
 ![alt text](./simpleapp_withledger.jpg "Optional Title1")
+
+Use case 2: How to replicate the Dapp/canister state evolution up to a given time
 
 ![alt text](./recreating_appstate.jpg "Optional Title2")
 
+Examples of both cases can be found [here](https://github.com/Neutrinomic/rechain/tree/master/test "Rechain tests using PocketIC")
 
 **Installation and test:**
-(TODO)
+
+1) Make sure node is installed (version 21.4 or superior): `nvm 21.4' 
 ```
 nvm 21.4
 go to test
