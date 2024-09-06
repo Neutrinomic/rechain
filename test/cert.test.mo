@@ -376,7 +376,8 @@ actor Self {
     });
     
     ignore Timer.setTimer<system>(#seconds 0, func () : async () {
-        await chain.start_archiving<system>();
+        //await chain.start_archiving<system>();
+        await chain.start_timers<system>();
     });
 
     public shared(msg) func set_ledger_canister(): async () {

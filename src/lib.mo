@@ -106,6 +106,8 @@ module {
     settings : ?T.InitArgs;
   }) {
 
+    var started = false;
+
     let history = SWB.SlidingWindowBuffer<T.Value>(mem.history);
 
     let archiveState = {
@@ -235,7 +237,7 @@ module {
 
 
     private func check_clean_up<system>() : async () {
-
+      if (not started) return;
       
       //clear the timer
       archiveState.cleaningTimer := null;
@@ -396,14 +398,59 @@ module {
 
       archiveState.bCleaning := false;
 
-      if (bRecallAtEnd) {
-        archiveState.cleaningTimer := ?Timer.setTimer<system>(#seconds(0), check_clean_up);
-      };
+      // ILDE: The following check is no longer necessary because "check_clean_up" is already executing every 30s 
+      // if (bRecallAtEnd) {
+      //   archiveState.cleaningTimer := ?Timer.setTimer<system>(#seconds(0), check_clean_up);
+      // };
 
       return;
     };
 
-    public func start_archiveCycleMaintenance<system>() : async () {
+    public func start_timers<system>() : async () {
+      // let syslog = SysLog.SysLog({_eventlog_mem=mem.eventlog_mem});
+      // let archives = Iter.toArray(Map.entries<Principal, T.TransactionRange>(mem.archives));
+     
+      // for (i in archives.keys()) {
+      //   let (a,_) = archives[i];
+      //   try {
+      //     let archiveActor = actor (Principal.toText(a)) : T.ArchiveInterface;        
+      //     let archive_cycles : Nat = await archiveActor.cycles();
+              
+      //     if (archive_cycles < archiveState.settings.minArchiveCycles) {
+      //       if (ExperimentalCycles.balance() > archiveState.settings.archiveCycles * 2) { 
+              
+      //         let refill_amount = archiveState.settings.archiveCycles;
+      //         try{
+      //           ExperimentalCycles.add<system>(refill_amount);
+      //           await archiveActor.deposit_cycles();
+      //         } catch (err) {
+      //           syslog.add("Err : Failed to refill " # Principal.toText(a) # " width " # debug_show(refill_amount) # " : " # Error.message(err));
+      //         };
+      //       } else { 
+      //         //warning ledger will eventually overload
+      //         Debug.print("Err : Not enough cycles to replenish archive canisters " # debug_show (ExperimentalCycles.balance()));
+      //       };
+      //     };
+      //   }
+      //   catch(err) {
+      //     syslog.add("Err : Failed to get canister " # Principal.toText(a) # " : " # Error.message(err));
+      //   };
+      // };
+      // ignore Timer.setTimer<system>(#seconds(archiveState.settings.secsCycleMaintenance), start_archiveCycleMaintenance);
+      if (started) Debug.trap("already started");
+      started := true;
+      
+      ignore Timer.recurringTimer<system>(#seconds 30, check_clean_up);
+      ignore Timer.recurringTimer<system>(#seconds(archiveState.settings.secsCycleMaintenance), archiveCycleMaintenance);
+    };
+
+    public func stop_timers() {
+      started := false;
+    };
+
+    private func archiveCycleMaintenance<system>() : async () {
+      if (not started) return;
+      
       let syslog = SysLog.SysLog({_eventlog_mem=mem.eventlog_mem});
       let archives = Iter.toArray(Map.entries<Principal, T.TransactionRange>(mem.archives));
      
@@ -433,7 +480,6 @@ module {
           syslog.add("Err : Failed to get canister " # Principal.toText(a) # " : " # Error.message(err));
         };
       };
-      ignore Timer.setTimer<system>(#seconds(archiveState.settings.secsCycleMaintenance), start_archiveCycleMaintenance);
     };
 
     public func check_archives_balance() : async () {
@@ -465,16 +511,17 @@ module {
       return;
     };
 
-    public func start_archiving<system>() : async () {
-        //Debug.print("inside start_archiving,"#debug_show(history.len())#""#debug_show(archiveState.settings.maxActiveRecords));
-        if (history.len() > archiveState.settings.maxActiveRecords) {
-          if (Option.isNull(archiveState.cleaningTimer)) {
-              archiveState.cleaningTimer := ?Timer.setTimer<system>(#seconds(0), check_clean_up);
-          }
-        };
+    // public func start_archiving<system>() : async () {
+    //     //Debug.print("inside start_archiving,"#debug_show(history.len())#""#debug_show(archiveState.settings.maxActiveRecords));
+    //     if (history.len() > archiveState.settings.maxActiveRecords) {
+    //       if (Option.isNull(archiveState.cleaningTimer)) {
+    //           archiveState.cleaningTimer := ?Timer.setTimer<system>(#seconds(0), check_clean_up);
+    //       }
+    //     };
 
-        ignore Timer.setTimer<system>(#seconds(30), start_archiving);
-    };
+    //     ignore Timer.setTimer<system>(#seconds(30), start_archiving);
+    //     //ignore Timer.recurringTimer<system>(#seconds 30, cycle);
+    // };
 
     public func stats() : T.Stats {
       return {

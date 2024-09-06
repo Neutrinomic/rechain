@@ -72,16 +72,22 @@ module {
         var lastTxTime : Nat64 = 0;
         let maxTransactionsInCall:Nat = 2000;
         
-        private func cycleNew() : async Bool {
-            Debug.print("CYCLENEW() <----------------------------");
+        private func cycleNew() : async () {
+            Debug.print("CYCLENEW(): "#debug_show(mem.last_indexed_tx));
 
-            if (not started) return false;
+            if (not started) return;
+
+            Debug.print("STARTED:"#"mem.last_indexed_tx:"#debug_show(mem.last_indexed_tx));
+
+            //if (not started) return false;
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
 
             if (mem.last_indexed_tx == 0) { // ILDE: last_indexed_tx: keeps the index of the block that is next to be read (not yet read)
                 switch(start_from_block) {  // ILDE: start_from_block (#id(id) or #last): #last means 
                     case (#id(id)) {
                         mem.last_indexed_tx := id;
+                        Debug.print("ID:" # debug_show(id));
+                        Debug.print("ID,mem.last_indexed_tx:" # debug_show(mem.last_indexed_tx));
                     };
                     case (#last) {
                         let rez = await ledger.icrc3_get_blocks([{//get_transactions({
@@ -89,6 +95,7 @@ module {
                             length = 0;
                         }]);
                         mem.last_indexed_tx := rez.log_length -1; // ILDE: it assigns last_indexed_t to the last block index in the ledger (start reading from the last)
+                        Debug.print("LAST,mem.last_indexed_tx:" # debug_show(mem.last_indexed_tx));
                     };
                 };
             };
@@ -98,22 +105,29 @@ module {
                 length = maxTransactionsInCall * 40; //ILDE: new constant 2000*40 (before 1000)
             }]);
             //NEWILDE
-            let quick_cycle:Bool = if (rez.log_length > mem.last_indexed_tx + 1000) true else false; // ILDE: flag returned by cycle: true if we are reading at least 1000 blocks in this cycle. Not sure why it return it???
+
+            Debug.print("FIRST REZ:" # debug_show(rez.log_length));
+
+            let quick_cycle:Bool = if (rez.log_length > mem.last_indexed_tx + 1000) true else false; // ILDE (not used since recurrent timer): flag returned by cycle: true if we are reading at least 1000 blocks in this cycle. Not sure why it return it???
 
             if (rez.archived_blocks.size() == 0) { //rez.archived_transactions.size() == 0) { //ILDE: case not reading from archive canisters in this cycle
+                Debug.print("rez.archived_blocks.size() == 0");
                 let sorted_blocks = sortBlocksById(rez.blocks);
+                Debug.print("b0:"#debug_show(sorted_blocks.size()));
                 let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
-   
+                 Debug.print("b01:"#debug_show(decoded_actions.size()));
                 await onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);//ILDE: NEW: not sure why we need to pass "last_index_tx"
-                
+                Debug.print("b02");
                 mem.last_indexed_tx += rez.blocks.size();//transactions.size();
-
+                Debug.print("b03");
                 if (rez.blocks.size() != 0) lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
+                Debug.print("b04");
+                Debug.print("rez.archived_blocks.size() == 0"#", blocks in online ledger:"#debug_show(mem.last_indexed_tx)#", blocks read:"#debug_show(rez.blocks.size()));
                                                           //ILDE: NEED TO DISCUSS: INSTEAD OF rez.transactions[rez.transactions.size() - 1].timestamp;
 
             } else { //ILDE: case where we need to access archive canisters
                 // We need to collect transactions from archive and get them in order
-
+                Debug.print("rez.archived_blocks.size() != 0");
                 type TransactionUnordered = {
                     start : Nat;
                     transactions : [?Block];
@@ -176,7 +190,7 @@ module {
 
                             onError("chunk.blocks.size() != " # Nat.toText(maxTransactionsInCall) # " | chunk.blocks.size(): " # Nat.toText(chunk.blocks.size())); //I: transactions -> blocks
                             
-                            return false;
+                            return ;//false;
                         };
                         Vector.add(
                             unordered,
@@ -214,7 +228,7 @@ module {
                 for (u in sorted.vals()) {
                     if (u.start != mem.last_indexed_tx) {
                         onError("u.start != mem.last_indexed_tx | u.start: " # Nat.toText(u.start) # " mem.last_indexed_tx: " # Nat.toText(mem.last_indexed_tx) # " u.transactions.size(): " # Nat.toText(u.transactions.size()));
-                        return false;
+                        return ;//false;
                     };
                     //BEFORE onRead(u.transactions, mem.last_indexed_tx);
                     //NEW
@@ -223,6 +237,7 @@ module {
                     await onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);
                     //ENDNEW                    
                     mem.last_indexed_tx += u.transactions.size();
+                    Debug.print("1)mem.last_indexed_tx;"#debug_show(mem.last_indexed_tx));
                     //BEFORE if (u.blocks.size() != 0) lastTxTime := u.transactions[u.transactions.size() - 1].timestamp;
                     //NEW
                     if (u.transactions.size() != 0) lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
@@ -247,6 +262,7 @@ module {
                     //BEFORE lastTxTime := rez.transactions[rez.transactions.size() - 1].timestamp;
                     //NEW
                     mem.last_indexed_tx += rez.blocks.size();//transactions.size();
+                    Debug.print("2)mem.last_indexed_tx;"#debug_show(mem.last_indexed_tx));
                     if (rez.blocks.size() != 0) lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
                     //ENDNEW
                 };
@@ -255,13 +271,13 @@ module {
             let inst_end = Prim.performanceCounter(1); // 1 is preserving with async
             onCycleEnd(inst_end - inst_start);
 
-            quick_cycle;
+            //quick_cycle;
         };
 
         private func cycle() : async () {
             Debug.print("in cycle()");
-            // Debug.print("started:"#debug_show(started));
             if (not started) return;
+
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
 
             if (mem.last_indexed_tx == 0) {
@@ -401,30 +417,36 @@ module {
             lastTxTime;
         };
 
-        private func cycle_shell() : async () {
-            try {
-                // We need it async or it won't throw errors
-                let aux = await cycleNew();
-            } catch (e) {
-                onError("cycle:" # Principal.toText(ledger_id) # ":" # Error.message(e));
-            };
+        // private func cycle_shell() : async () {
+        //     try {
+        //         // We need it async or it won't throw errors
+        //         let aux = await cycleNew();
+        //     } catch (e) {
+        //         onError("cycle:" # Principal.toText(ledger_id) # ":" # Error.message(e));
+        //     };
 
-            if (started) ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
-        };
+        //     if (started) ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
+        // };
 
-        public func start<system>(): async () {
+        public func start_timers<system>(): async () {
             if (started) Debug.print("already started");//Debug.trap("already started");
-            //started := true;
-            ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
-        };
-
-        public func enable() : async () {
             started := true;
+            
+            //ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
+            ignore Timer.recurringTimer<system>(#seconds 2, cycleNew);
         };
 
-        public func disable() : async () {
+        public func stop_timers() {
             started := false;
-        }
+        };
+
+        // public func enable() : async () {
+        //     started := true;
+        // };
+
+        // public func disable() : async () {
+        //     started := false;
+        // }
     };
 
 };

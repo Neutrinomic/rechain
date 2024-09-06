@@ -67,7 +67,8 @@ actor class Delta({archive_controllers: [Principal]}) = this {
     });
     
     ignore Timer.setTimer<system>(#seconds 0, func () : async () {
-        await chain.start_archiving<system>();
+        //await chain.start_archiving<system>();
+        await chain.start_timers<system>();
     });
     // -----
     

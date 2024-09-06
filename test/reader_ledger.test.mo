@@ -181,8 +181,7 @@ actor Self {//KeyValue(phonebook : Nat){
 
     ignore Timer.setTimer<system>(#seconds 0, func () : async () {
         Debug.print("inside setTimer");
-        await chain.start_archiving<system>();
-        await chain.start_archiveCycleMaintenance<system>();
+        await chain.start_timers<system>();
 
         //await chain.start_archiveCycleMaintenance<system>(); 
     });
