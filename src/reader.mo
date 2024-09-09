@@ -14,6 +14,8 @@ import Int "mo:base/Int";
 import T "./types";
 import TLedger "../test/ledger/types";
 import List "mo:base/List";
+import Iter "mo:base/Iter";
+
 
 // From https://github.com/Neutrinomic/devefi_icrc_ledger/tree/master
 module {
@@ -64,13 +66,14 @@ module {
         decodeBlock : (?Block) -> A;       //ILDE:Block 
         getTimeFromAction : A -> Nat64;    //ILDE:added
     }) {
-        var started = false;
+        var started = false; // If this flag is off, the reader does nothing
+
         let ledger = actor (Principal.toText(ledger_id)) : T.ICRC3Interface; 
         // let noarchive = actor (Principal.toText(noarchive_id)) : TLedger.NoArchiveInterface; //ILDE: Ideally, this interface should be passed as parameter
         //                                                                                      //     problems is "Action" and "ActionError" belong to "test/types.mo"
         //                                                                                      //     idea: pass E to Reader and define interface here (TBD) 
         var lastTxTime : Nat64 = 0;
-        let maxTransactionsInCall:Nat = 2000;
+        let maxTransactionsInCall:Nat = 50;//ONLY FOR DEBUG. PUT 2000 in production. Consistent with Rechain minsize of archives!!!!!!!!!!!!;
         
         private func cycleNew() : async () {
             Debug.print("CYCLENEW(): "#debug_show(mem.last_indexed_tx));
@@ -106,23 +109,26 @@ module {
             }]);
             //NEWILDE
 
-            Debug.print("FIRST REZ:" # debug_show(rez.log_length));
+            Debug.print("FIRST REZ:" # debug_show(rez.log_length)#":"# debug_show(mem.last_indexed_tx)#":"# debug_show(maxTransactionsInCall * 40));
 
             let quick_cycle:Bool = if (rez.log_length > mem.last_indexed_tx + 1000) true else false; // ILDE (not used since recurrent timer): flag returned by cycle: true if we are reading at least 1000 blocks in this cycle. Not sure why it return it???
 
             if (rez.archived_blocks.size() == 0) { //rez.archived_transactions.size() == 0) { //ILDE: case not reading from archive canisters in this cycle
-                Debug.print("rez.archived_blocks.size() == 0");
+                //Debug.print("rez.archived_blocks.size() == 0");
                 let sorted_blocks = sortBlocksById(rez.blocks);
-                Debug.print("b0:"#debug_show(sorted_blocks.size()));
+                //Debug.print("b0:"#debug_show(sorted_blocks.size()));
                 let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
-                 Debug.print("b01:"#debug_show(decoded_actions.size()));
+                Debug.print("b01:"#debug_show(decoded_actions.size()));
+                try{
+                    
                 await onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);//ILDE: NEW: not sure why we need to pass "last_index_tx"
+                } catch e {Debug.print("readercycleERROR:"#Error.message(e))};
                 Debug.print("b02");
                 mem.last_indexed_tx += rez.blocks.size();//transactions.size();
-                Debug.print("b03");
+                //Debug.print("b03");
                 if (rez.blocks.size() != 0) lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
-                Debug.print("b04");
-                Debug.print("rez.archived_blocks.size() == 0"#", blocks in online ledger:"#debug_show(mem.last_indexed_tx)#", blocks read:"#debug_show(rez.blocks.size()));
+                //Debug.print("b04");
+                //Debug.print("rez.archived_blocks.size() == 0"#", blocks in online ledger:"#debug_show(mem.last_indexed_tx)#", blocks read:"#debug_show(rez.blocks.size()));
                                                           //ILDE: NEED TO DISCUSS: INSTEAD OF rez.transactions[rez.transactions.size() - 1].timestamp;
 
             } else { //ILDE: case where we need to access archive canisters
@@ -142,13 +148,13 @@ module {
                     start : Nat;
                     transactions : [{block : ?Block; id : Nat}];
                 };
-                
+                Debug.print("c1");
                 //ILDE let unordered = Vector.new<BlocksUnordered>(); // Probably a better idea would be to use a large enough var array
                 let unordered = Vector.new<myBlocksUnorderedtype>(); 
-
+                Debug.print("c12");
                 //ILDE: extend args such that all blocks are of size maxTransactionsInCall or smaller
                 //ILDE: new
-                
+                Debug.print("c13");
                 let args_maxsize_ext = Vector.new<[GetBlocksRequest]>();
                 //let args_starts = Vector.new<[Nat]>();
                 for (atx in rez.archived_blocks.vals()) {
@@ -165,33 +171,47 @@ module {
                     Vector.add(args_maxsize_ext, arg_ext_flat,);
                 };
                 let args_ext : [[GetBlocksRequest]] = Vector.toArray(args_maxsize_ext);
-
+                Debug.print("c14");
                 var buf = List.nil<async T.GetTransactionsResult>();
-                var data = List.nil<T.GetTransactionsResult>();//TransactionRange>();
+                var data = List.nil<T.GetTransactionsResult>();Debug.print("c141");
+                Debug.print(debug_show(args_ext)); //nice consistent blocks
+                Debug.print(debug_show(rez.archived_blocks.size()));
                 var i = 0;
                 for (atx in rez.archived_blocks.vals()) {
                     // The calls are sent here without awaiting anything
-                    let promise = atx.callback(args_ext[i]);   
-                    buf := List.push(promise, buf); 
-                };
+                    Debug.print("args_ext[i]:"#debug_show(args_ext[i]));
+                    let aux = args_ext[i];
+                    for (j in Iter.range(0, aux.size() - 1)) {
+                        let args_exti_j = aux[j];
+                        let promise = atx.callback([args_exti_j]);
+                        buf := List.push(promise, buf); 
+                    };
+                    //let promise = atx.callback(args_ext[i]);   
+                    //buf := List.push(promise, buf); 
+                    i := i + 1;
+                };Debug.print("c142");
                 //I? Why is this faster? because we make all the call at once??
                 for (promise in List.toIter(buf)) {
                   // Await results of all promises. We recieve them in sequential order
-                   data := List.push(await promise, data);
+                  data := List.push(await promise, data);Debug.print("c143");   //<---- THIS BLOCKS and crashes (timeout?)
                 };
                 let chunks : [T.GetTransactionsResult] = List.toArray(data); // I: note the type allows to identify the id of every block
-
-                //I:<----- copied from devefi and adapted (look at comments with I)
+                Debug.print("c15");
+                //I: copied from devefi and adapted (look at comments with I)
+                Debug.print("c16");
                 var chunk_idx = 0;
                 for (chunk in chunks.vals()) {
                     if (chunk.blocks.size() > 0) { // I: transactions -> blocks
                         // If chunks (except the last one) are smaller than 2000 tx then implementation is strange
                         if ((chunk_idx < (chunks.size() - 1:Nat)) and (chunk.blocks.size() != maxTransactionsInCall)) {  //I: args.size() -> chunks.size()
-
+                            Debug.print("NOOKchunk");
+                            Debug.print(debug_show(chunk.blocks.size()));
+                            Debug.print(debug_show(maxTransactionsInCall));
                             onError("chunk.blocks.size() != " # Nat.toText(maxTransactionsInCall) # " | chunk.blocks.size(): " # Nat.toText(chunk.blocks.size())); //I: transactions -> blocks
                             
                             return ;//false;
                         };
+                        Debug.print("OKchunk");
                         Vector.add(
                             unordered,
                             {
@@ -202,7 +222,7 @@ module {
                     };
                     chunk_idx += 1;
                 };
-
+                Debug.print("chunks:"#debug_show(chunks.size()));
                 //I: we need to transform from "myBlocksUnorderedtype" to "TransactionUnordered" (required by the new algorithm)
                 // type myBlocksUnorderedtype = {
                 //     start : Nat;
@@ -429,24 +449,20 @@ module {
         // };
 
         public func start_timers<system>(): async () {
-            if (started) Debug.print("already started");//Debug.trap("already started");
-            started := true;
+            // if (started) Debug.print("already started");//Debug.trap("already started");
+            // started := true;
             
             //ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
             ignore Timer.recurringTimer<system>(#seconds 2, cycleNew);
         };
 
-        public func stop_timers() {
-            started := false;
+        public func start_timer_flag() : async () {
+           started := true;
         };
 
-        // public func enable() : async () {
-        //     started := true;
-        // };
-
-        // public func disable() : async () {
-        //     started := false;
-        // }
+        public func stop_timer_flag() : async () {
+           started := false;
+        };
     };
 
 };

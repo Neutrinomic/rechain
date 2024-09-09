@@ -26,6 +26,7 @@ import Text "mo:base/Text";
 
 //ILDE reader NEW
 import reader "../src/reader";
+import Error "mo:base/Error";
 
 actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = Self {
 
@@ -185,16 +186,23 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
     func myOnRead(actions: [T.Action]): async () {
         Debug.print("onRead:"#debug_show(actions.size()));
         // Debug.print("actions.size:"#debug_show(actions.size()));
-        let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;
-        Debug.print("r1");
         var i = 0;
+        var err : T.NoArchiveDispatchReturn = #Ok(0);
+        try{
+            let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;
+        //Debug.print("r1");
         for(action in actions.vals()) {
-            Debug.print("r2:"#debug_show(i));
-            let err = await noarchive.add_record(action);
-            Debug.print("r3"#debug_show(err));
+            //Debug.print("r2:"#debug_show(i));
+            try{
+                err := await noarchive.add_record(action);
+            } catch e {Debug.print("IMHERE2");Debug.print("rerror:"#debug_show(Error.code(e))#", e message:"#debug_show(Error.message(e)));};
+            //Debug.print("r3"#debug_show(err));
             i := i+1;
         };
-        Debug.print("r4");
+        } catch e {Debug.print("IMHERE1");Debug.print("rerror:"#debug_show(Error.code(e))#", e message:"#debug_show(Error.message(e)));};
+        
+        Debug.print("r3"#debug_show(err)#", i:"#debug_show(i));
+        //Debug.print("r4");
     };
 
     func myOnReadNew(actions: [T.Action], id_nat : Nat): async () {
@@ -238,6 +246,13 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
 
         //await chain.start_archiveCycleMaintenance<system>(); 
     });
+      
+    public func start_timer(): async () {
+         await my_reader.start_timer_flag();
+    };
+    public func stop_timer(): async () {
+         await my_reader.stop_timer_flag();
+    };
     
 
 };

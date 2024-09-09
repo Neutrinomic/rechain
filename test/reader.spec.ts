@@ -295,7 +295,12 @@ describe("reader", () => {
     for (; i < 500; i++) {
       let r = await can_ledger.add_record(my_mint_action);
     }
+    
     await passTime(100);
+
+    await can_reader.start_timer();
+
+    await passTime(5);
 
     let my_account : Account = {'owner' : john0.getPrincipal(),
                                 'subaccount' : []};

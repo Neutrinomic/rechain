@@ -40,15 +40,19 @@ module {
 
     public func dispatch(action : A) : ({ #Ok : BlockId; #Err : E }) {
       // Execute reducers
+      //Debug.print("n0");
       let reducerResponse = Array.map<ActionReducer<A, E>, ReducerResponse<E>>(reducers, func(fn) = fn(action));
       // Check if any reducer returned an error and terminate if so
+      //Debug.print("n1");
       let hasError = Array.find<ReducerResponse<E>>(reducerResponse, func(resp) = switch (resp) { case (#Err(_)) true; case (_) false });
-
+      //Debug.print("n2");
       switch (hasError) { case (? #Err(e)) { return #Err(e) }; case (_) () };
+      //Debug.print("n3");
       let blockId = mem.lastIndex + 1; //archiveState.history.end() + 1; // ILDE: now archiveState.lastIndex is the id of last block in the ledger
+      //Debug.print("n4");
       // Execute state changes if no errors
       ignore Array.map<ReducerResponse<E>, ()>(reducerResponse, func(resp) { let #Ok(f) = resp else return (); f(blockId) });
-
+      //Debug.print("n5");
       mem.lastIndex := blockId;
 
       #Ok(blockId);
