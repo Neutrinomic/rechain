@@ -78,7 +78,7 @@ module {
         private func cycleNew() : async () {
             Debug.print("CYCLENEW(): "#debug_show(mem.last_indexed_tx));
 
-            if (not started) return;
+            //if (not started) return;
 
             Debug.print("STARTED:"#"mem.last_indexed_tx:"#debug_show(mem.last_indexed_tx));
 
@@ -119,13 +119,12 @@ module {
                 //Debug.print("b0:"#debug_show(sorted_blocks.size()));
                 let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
                 Debug.print("b01:"#debug_show(decoded_actions.size()));
-                try{
-                    
+                //try{    
                 await onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);//ILDE: NEW: not sure why we need to pass "last_index_tx"
-                } catch e {Debug.print("readercycleERROR:"#Error.message(e))};
+                //} catch e {Debug.print("readercycleERROR:"#Error.message(e))};
                 Debug.print("b02");
                 mem.last_indexed_tx += rez.blocks.size();//transactions.size();
-                //Debug.print("b03");
+                Debug.print("b03"#debug_show(mem.last_indexed_tx));
                 if (rez.blocks.size() != 0) lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
                 //Debug.print("b04");
                 //Debug.print("rez.archived_blocks.size() == 0"#", blocks in online ledger:"#debug_show(mem.last_indexed_tx)#", blocks read:"#debug_show(rez.blocks.size()));
@@ -185,7 +184,7 @@ module {
                         let args_exti_j = aux[j];
                         let promise = atx.callback([args_exti_j]);
                         buf := List.push(promise, buf); 
-                    };
+                    };  
                     //let promise = atx.callback(args_ext[i]);   
                     //buf := List.push(promise, buf); 
                     i := i + 1;
@@ -246,7 +245,12 @@ module {
                 let sorted = Array.sort<myBlocksUnorderedtype>(Vector.toArray(unordered), func(a, b) = Nat.compare(a.start, b.start));
 
                 for (u in sorted.vals()) {
+                    Debug.print("Sorted:"#debug_show(u.start));
+                };
+
+                for (u in sorted.vals()) {
                     if (u.start != mem.last_indexed_tx) {
+                        Debug.print("THIS:"#debug_show(u.start)#":"#debug_show(mem.last_indexed_tx));
                         onError("u.start != mem.last_indexed_tx | u.start: " # Nat.toText(u.start) # " mem.last_indexed_tx: " # Nat.toText(mem.last_indexed_tx) # " u.transactions.size(): " # Nat.toText(u.transactions.size()));
                         return ;//false;
                     };
@@ -254,7 +258,9 @@ module {
                     //NEW
                     let sorted_blocks = sortBlocksById(u.transactions);
                     let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
+                    Debug.print("b onRead, Sorted:"#debug_show(u.start));
                     await onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);
+                    Debug.print("a onRead, Sorted:"#debug_show(u.start));
                     //ENDNEW                    
                     mem.last_indexed_tx += u.transactions.size();
                     Debug.print("1)mem.last_indexed_tx;"#debug_show(mem.last_indexed_tx));
@@ -270,7 +276,8 @@ module {
                     //     onError("rez.first_index !== mem.last_indexed_tx | rez.first_index: " # Nat.toText(rez.first_index) # " mem.last_indexed_tx: " # Nat.toText(mem.last_indexed_tx) # " rez.transactions.size(): " # Nat.toText(rez.transactions.size()));
                     //     return false;
                     // };
-
+                    Debug.print("-----------------------------------");
+                    Debug.print("rez.blocks.size() != 0");
                     //BEFORE onRead(rez.transactions, mem.last_indexed_tx);
                     //NEW
                     let sorted_blocks = sortBlocksById(rez.blocks);
@@ -394,6 +401,8 @@ module {
                 //ILDE let sorted = Array.sort<BlocksUnordered>(Vector.toArray(unordered), func(a, b) = Nat.compare(a.start, b.start));
                 let sorted = Array.sort<myBlocksUnorderedtype>(Vector.toArray(unordered), func(a, b) = Nat.compare(a.start, b.start));
 
+               
+
                 //<----IMHERE
                 for (u in sorted.vals()) {
                     assert (u.start == mem.last_indexed_tx);
@@ -437,23 +446,25 @@ module {
             lastTxTime;
         };
 
-        // private func cycle_shell() : async () {
-        //     try {
-        //         // We need it async or it won't throw errors
-        //         let aux = await cycleNew();
-        //     } catch (e) {
-        //         onError("cycle:" # Principal.toText(ledger_id) # ":" # Error.message(e));
-        //     };
+        private func cycle_shell() : async () {
+            if (started == true) {
+                try {
+                    // We need it async or it won't throw errors
+                    let aux = await cycleNew();
+                } catch (e) {
+                    onError("cycle:" # Principal.toText(ledger_id) # ":" # Error.message(e));
+                };
+            };
 
-        //     if (started) ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
-        // };
+            if (started == true) ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
+        };
 
         public func start_timers<system>(): async () {
             // if (started) Debug.print("already started");//Debug.trap("already started");
             // started := true;
             
             //ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
-            ignore Timer.recurringTimer<system>(#seconds 2, cycleNew);
+            ignore Timer.setTimer<system>(#seconds 2, cycleNew);
         };
 
         public func start_timer_flag() : async () {
