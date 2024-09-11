@@ -73,22 +73,19 @@ module {
         //                                                                                      //     problems is "Action" and "ActionError" belong to "test/types.mo"
         //                                                                                      //     idea: pass E to Reader and define interface here (TBD) 
         var lastTxTime : Nat64 = 0;
-        let maxTransactionsInCall:Nat = 50;//ONLY FOR DEBUG. PUT 2000 in production. Consistent with Rechain minsize of archives!!!!!!!!!!!!;
+        let maxTransactionsInCall:Nat = 2000;//50;//ONLY FOR DEBUG. PUT 2000 in production. Consistent with Rechain minsize of archives!!!!!!!!!!!!;
         
         var lock:Int = 0;
         let MAX_TIME_LOCKED:Int = 120_000_000_000; // 120 seconds
 
 
         private func cycleNew() : async () {
-            Debug.print("CYCLENEW(): "#debug_show(mem.last_indexed_tx));
 
             if (not started) return;
 
             let now = Time.now();
             if (now-lock < MAX_TIME_LOCKED) return
             lock := now;
-
-            Debug.print("STARTED:"#"mem.last_indexed_tx:"#debug_show(mem.last_indexed_tx));
 
             //if (not started) return false;
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
@@ -97,8 +94,6 @@ module {
                 switch(start_from_block) {  // ILDE: start_from_block (#id(id) or #last): #last means 
                     case (#id(id)) {
                         mem.last_indexed_tx := id;
-                        Debug.print("ID:" # debug_show(id));
-                        Debug.print("ID,mem.last_indexed_tx:" # debug_show(mem.last_indexed_tx));
                     };
                     case (#last) {
                         let rez = await ledger.icrc3_get_blocks([{//get_transactions({
@@ -106,7 +101,6 @@ module {
                             length = 0;
                         }]);
                         mem.last_indexed_tx := rez.log_length -1; // ILDE: it assigns last_indexed_t to the last block index in the ledger (start reading from the last)
-                        Debug.print("LAST,mem.last_indexed_tx:" # debug_show(mem.last_indexed_tx));
                     };
                 };
             };
@@ -117,30 +111,23 @@ module {
             }]);
             //NEWILDE
 
-            Debug.print("FIRST REZ:" # debug_show(rez.log_length)#":"# debug_show(mem.last_indexed_tx)#":"# debug_show(maxTransactionsInCall * 40));
-
             let quick_cycle:Bool = if (rez.log_length > mem.last_indexed_tx + 1000) true else false; // ILDE (not used since recurrent timer): flag returned by cycle: true if we are reading at least 1000 blocks in this cycle. Not sure why it return it???
 
             if (rez.archived_blocks.size() == 0) { //rez.archived_transactions.size() == 0) { //ILDE: case not reading from archive canisters in this cycle
-                //Debug.print("rez.archived_blocks.size() == 0");
+                
                 let sorted_blocks = sortBlocksById(rez.blocks);
-                //Debug.print("b0:"#debug_show(sorted_blocks.size()));
+
                 let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
-                Debug.print("b01:"#debug_show(decoded_actions.size()));
-                //try{    
-                await onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);//ILDE: NEW: not sure why we need to pass "last_index_tx"
-                //} catch e {Debug.print("readercycleERROR:"#Error.message(e))};
-                Debug.print("b02");
+ 
+                await onReadNew(decoded_actions, mem.last_indexed_tx);
+          
                 mem.last_indexed_tx += rez.blocks.size();//transactions.size();
-                Debug.print("b03"#debug_show(mem.last_indexed_tx));
+
                 if (rez.blocks.size() != 0) lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
-                //Debug.print("b04");
-                //Debug.print("rez.archived_blocks.size() == 0"#", blocks in online ledger:"#debug_show(mem.last_indexed_tx)#", blocks read:"#debug_show(rez.blocks.size()));
-                                                          //ILDE: NEED TO DISCUSS: INSTEAD OF rez.transactions[rez.transactions.size() - 1].timestamp;
+                //ILDE: NEED TO DISCUSS: INSTEAD OF rez.transactions[rez.transactions.size() - 1].timestamp;
 
             } else { //ILDE: case where we need to access archive canisters
                 // We need to collect transactions from archive and get them in order
-                Debug.print("rez.archived_blocks.size() != 0");
                 type TransactionUnordered = {
                     start : Nat;
                     transactions : [?Block];
@@ -155,13 +142,9 @@ module {
                     start : Nat;
                     transactions : [{block : ?Block; id : Nat}];
                 };
-                Debug.print("c1");
                 //ILDE let unordered = Vector.new<BlocksUnordered>(); // Probably a better idea would be to use a large enough var array
                 let unordered = Vector.new<myBlocksUnorderedtype>(); 
-                Debug.print("c12");
                 //ILDE: extend args such that all blocks are of size maxTransactionsInCall or smaller
-                //ILDE: new
-                Debug.print("c13");
                 let args_maxsize_ext = Vector.new<[GetBlocksRequest]>();
                 //let args_starts = Vector.new<[Nat]>();
                 for (atx in rez.archived_blocks.vals()) {
@@ -178,15 +161,14 @@ module {
                     Vector.add(args_maxsize_ext, arg_ext_flat,);
                 };
                 let args_ext : [[GetBlocksRequest]] = Vector.toArray(args_maxsize_ext);
-                Debug.print("c14");
+
                 var buf = List.nil<async T.GetTransactionsResult>();
-                var data = List.nil<T.GetTransactionsResult>();Debug.print("c141");
-                Debug.print(debug_show(args_ext)); //nice consistent blocks
-                Debug.print(debug_show(rez.archived_blocks.size()));
+                var data = List.nil<T.GetTransactionsResult>();
+
                 var i = 0;
                 for (atx in rez.archived_blocks.vals()) {
                     // The calls are sent here without awaiting anything
-                    Debug.print("args_ext[i]:"#debug_show(args_ext[i]));
+
                     let aux = args_ext[i];
                     for (j in Iter.range(0, aux.size() - 1)) {
                         let args_exti_j = aux[j];
@@ -196,30 +178,28 @@ module {
                     //let promise = atx.callback(args_ext[i]);   
                     //buf := List.push(promise, buf); 
                     i := i + 1;
-                };Debug.print("c142");
+                };
                 //I? Why is this faster? because we make all the call at once??
                 for (promise in List.toIter(buf)) {
                   // Await results of all promises. We recieve them in sequential order
-                  data := List.push(await promise, data);Debug.print("c143");   //<---- THIS BLOCKS and crashes (timeout?)
+                  data := List.push(await promise, data);  
                 };
                 let chunks : [T.GetTransactionsResult] = List.toArray(data); // I: note the type allows to identify the id of every block
-                Debug.print("c15");
+               
                 //I: copied from devefi and adapted (look at comments with I)
-                Debug.print("c16");
+
                 var chunk_idx = 0;
                 for (chunk in chunks.vals()) {
                     if (chunk.blocks.size() > 0) { // I: transactions -> blocks
                         // If chunks (except the last one) are smaller than 2000 tx then implementation is strange
                         if ((chunk_idx < (chunks.size() - 1:Nat)) and (chunk.blocks.size() != maxTransactionsInCall)) {  //I: args.size() -> chunks.size()
-                            Debug.print("NOOKchunk");
-                            Debug.print(debug_show(chunk.blocks.size()));
-                            Debug.print(debug_show(maxTransactionsInCall));
+
                             onError("chunk.blocks.size() != " # Nat.toText(maxTransactionsInCall) # " | chunk.blocks.size(): " # Nat.toText(chunk.blocks.size())); //I: transactions -> blocks
                             
                             lock := 0; // unlock the cycle method
                             return ;//false;
                         };
-                        Debug.print("OKchunk");
+
                         Vector.add(
                             unordered,
                             {
@@ -230,7 +210,7 @@ module {
                     };
                     chunk_idx += 1;
                 };
-                Debug.print("chunks:"#debug_show(chunks.size()));
+
                 //I: we need to transform from "myBlocksUnorderedtype" to "TransactionUnordered" (required by the new algorithm)
                 // type myBlocksUnorderedtype = {
                 //     start : Nat;
@@ -254,54 +234,35 @@ module {
                 let sorted = Array.sort<myBlocksUnorderedtype>(Vector.toArray(unordered), func(a, b) = Nat.compare(a.start, b.start));
 
                 for (u in sorted.vals()) {
-                    Debug.print("Sorted:"#debug_show(u.start));
-                };
-
-                for (u in sorted.vals()) {
                     if (u.start != mem.last_indexed_tx) {
                         Debug.print("THIS:"#debug_show(u.start)#":"#debug_show(mem.last_indexed_tx));
                         onError("u.start != mem.last_indexed_tx | u.start: " # Nat.toText(u.start) # " mem.last_indexed_tx: " # Nat.toText(mem.last_indexed_tx) # " u.transactions.size(): " # Nat.toText(u.transactions.size()));
                         lock := 0; // unlock the cycle method
-                        return ;//false;
+                        return ;
                     };
-                    //BEFORE onRead(u.transactions, mem.last_indexed_tx);
-                    //NEW
+
                     let sorted_blocks = sortBlocksById(u.transactions);
                     let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
-                    Debug.print("b onRead, Sorted:"#debug_show(u.start));
+          
                     await onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);
-                    Debug.print("a onRead, Sorted:"#debug_show(u.start));
-                    //ENDNEW                    
+                  
                     mem.last_indexed_tx += u.transactions.size();
-                    Debug.print("1)mem.last_indexed_tx;"#debug_show(mem.last_indexed_tx));
-                    //BEFORE if (u.blocks.size() != 0) lastTxTime := u.transactions[u.transactions.size() - 1].timestamp;
-                    //NEW
+
                     if (u.transactions.size() != 0) lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
-                    //ENDNEW
+
                 };   
 
                 //I: in our case, rez.first_index does not exist, so I comment the whole internal if
                 if (rez.blocks.size() != 0) { //I: transactions -> blocks
-                    // if (rez.first_index != mem.last_indexed_tx) {
-                    //     onError("rez.first_index !== mem.last_indexed_tx | rez.first_index: " # Nat.toText(rez.first_index) # " mem.last_indexed_tx: " # Nat.toText(mem.last_indexed_tx) # " rez.transactions.size(): " # Nat.toText(rez.transactions.size()));
-                    //     return false;
-                    // };
-                    Debug.print("-----------------------------------");
-                    Debug.print("rez.blocks.size() != 0");
-                    //BEFORE onRead(rez.transactions, mem.last_indexed_tx);
-                    //NEW
+
                     let sorted_blocks = sortBlocksById(rez.blocks);
                     let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
                     await onReadNew(decoded_actions, mem.last_indexed_tx);
-                    //ENDNEW
 
-                    //BEFORE mem.last_indexed_tx += rez.transactions.size();
-                    //BEFORE lastTxTime := rez.transactions[rez.transactions.size() - 1].timestamp;
-                    //NEW
                     mem.last_indexed_tx += rez.blocks.size();//transactions.size();
-                    Debug.print("2)mem.last_indexed_tx;"#debug_show(mem.last_indexed_tx));
+
                     if (rez.blocks.size() != 0) lastTxTime := getTimeFromAction(decoded_actions[Array.size(decoded_actions) - 1]);
-                    //ENDNEW
+
                 };
             };
 
@@ -313,7 +274,7 @@ module {
         };
 
         private func cycle() : async () {
-            Debug.print("in cycle()");
+            
             if (not started) return;
 
             let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
@@ -345,13 +306,7 @@ module {
                 let sorted_blocks = sortBlocksById(rez.blocks);
 
                 let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
-                // Debug.print("before onRead 1");
-                //ledger.print_ledger();
-                // Debug.print("lastIndex:"#debug_show(mem.last_indexed_tx));
-                // Debug.print(debug_show(rez.blocks.size()));
-                // Debug.print(debug_show(rez.archived_blocks.size()));
-                // Debug.print(debug_show(sorted_blocks.size()));
-                // Debug.print(debug_show(decoded_actions.size()));
+
                 await onRead(decoded_actions);//rez.blocks);//transactions);
                 
                 mem.last_indexed_tx += rez.blocks.size();//transactions.size();
@@ -421,10 +376,7 @@ module {
                     //ILDE
                     let sorted_blocks = sortBlocksById(u.transactions);//blocks);
                     let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
-                    // Debug.print("before onRead 2");
-                    // Debug.print(debug_show(sorted_blocks.size()));
-                    // Debug.print(debug_show(decoded_actions.size()));
-                    await onRead(decoded_actions);//rez.blocks);//transactions);
+
 
                     mem.last_indexed_tx += u.transactions.size();
                     //rez.blocks.size();//transactions.size();
@@ -438,9 +390,7 @@ module {
                 if (rez.blocks.size() != 0) {
                     let sorted_blocks = sortBlocksById(rez.blocks);
                     let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
-                    // Debug.print("before onRead 3");
-                    // Debug.print(debug_show(sorted_blocks.size()));
-                    // Debug.print(debug_show(decoded_actions.size()));
+
                     await onRead(decoded_actions);//rez.blocks);//transactions);
                     //onRead(rez.transactions);
                     mem.last_indexed_tx += rez.blocks.size();

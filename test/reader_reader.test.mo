@@ -184,25 +184,17 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
     };
 
     func myOnRead(actions: [T.Action]): async () {
-        Debug.print("onRead:"#debug_show(actions.size()));
-        // Debug.print("actions.size:"#debug_show(actions.size()));
         var i = 0;
         var err : T.NoArchiveDispatchReturn = #Ok(0);
-        try{
-            let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;
-        //Debug.print("r1");
+        let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;
+
         for(action in actions.vals()) {
-            //Debug.print("r2:"#debug_show(i));
             try{
                 err := await noarchive.add_record(action);
             } catch e {Debug.print("IMHERE2");Debug.print("rerror:"#debug_show(Error.code(e))#", e message:"#debug_show(Error.message(e)));};
-            //Debug.print("r3"#debug_show(err));
+        
             i := i+1;
         };
-        } catch e {Debug.print("IMHERE1");Debug.print("rerror:"#debug_show(Error.code(e))#", e message:"#debug_show(Error.message(e)));};
-        
-        Debug.print("r3"#debug_show(err)#", i:"#debug_show(i));
-        //Debug.print("r4");
     };
 
     func myOnReadNew(actions: [T.Action], id_nat : Nat): async () {
@@ -210,7 +202,6 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
     };
 
     func onError(error_text: Text) {   //ILDE: TBD: use SysLog
-        Debug.print("onError:");
         Debug.print(debug_show(error_text));
     };
 
@@ -240,11 +231,9 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
     //let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;
 
     ignore Timer.setTimer<system>(#seconds 0, func () : async () {
-        Debug.print("inside setTimer of reader");
-        Debug.print("ledger pid from insider reader:"#debug_show(ledger_pid));
+
         await my_reader.start_timers<system>();
 
-        //await chain.start_archiveCycleMaintenance<system>(); 
     });
       
     public func start_timer(): async () {
