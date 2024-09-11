@@ -75,10 +75,18 @@ module {
         var lastTxTime : Nat64 = 0;
         let maxTransactionsInCall:Nat = 50;//ONLY FOR DEBUG. PUT 2000 in production. Consistent with Rechain minsize of archives!!!!!!!!!!!!;
         
+        var lock:Int = 0;
+        let MAX_TIME_LOCKED:Int = 120_000_000_000; // 120 seconds
+
+
         private func cycleNew() : async () {
             Debug.print("CYCLENEW(): "#debug_show(mem.last_indexed_tx));
 
-            //if (not started) return;
+            if (not started) return;
+
+            let now = Time.now();
+            if (now-lock < MAX_TIME_LOCKED) return
+            lock := now;
 
             Debug.print("STARTED:"#"mem.last_indexed_tx:"#debug_show(mem.last_indexed_tx));
 
@@ -208,6 +216,7 @@ module {
                             Debug.print(debug_show(maxTransactionsInCall));
                             onError("chunk.blocks.size() != " # Nat.toText(maxTransactionsInCall) # " | chunk.blocks.size(): " # Nat.toText(chunk.blocks.size())); //I: transactions -> blocks
                             
+                            lock := 0; // unlock the cycle method
                             return ;//false;
                         };
                         Debug.print("OKchunk");
@@ -252,6 +261,7 @@ module {
                     if (u.start != mem.last_indexed_tx) {
                         Debug.print("THIS:"#debug_show(u.start)#":"#debug_show(mem.last_indexed_tx));
                         onError("u.start != mem.last_indexed_tx | u.start: " # Nat.toText(u.start) # " mem.last_indexed_tx: " # Nat.toText(mem.last_indexed_tx) # " u.transactions.size(): " # Nat.toText(u.transactions.size()));
+                        lock := 0; // unlock the cycle method
                         return ;//false;
                     };
                     //BEFORE onRead(u.transactions, mem.last_indexed_tx);
@@ -298,6 +308,7 @@ module {
             let inst_end = Prim.performanceCounter(1); // 1 is preserving with async
             onCycleEnd(inst_end - inst_start);
 
+            lock := 0; // unlock the cycle method
             //quick_cycle;
         };
 
@@ -463,8 +474,8 @@ module {
             // if (started) Debug.print("already started");//Debug.trap("already started");
             // started := true;
             
-            //ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
-            ignore Timer.setTimer<system>(#seconds 2, cycleNew);
+            ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
+            //ignore Timer.setTimer<system>(#seconds 2, cycleNew);
         };
 
         public func start_timer_flag() : async () {

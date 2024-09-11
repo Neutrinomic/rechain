@@ -295,9 +295,7 @@ describe("reader", () => {
     for (; i < 500; i++) {
       let r = await can_ledger.add_record(my_mint_action);
     }
-    
-    await passTime(100);
-
+   
     await can_reader.start_timer();
 
     await passTime(5);
@@ -306,25 +304,14 @@ describe("reader", () => {
                                 'subaccount' : []};
     let r_balance = await can_ledger.icrc1_balance_of(my_account);
     
-    console.log("John0 balance: ", r_balance);
+    console.log("John0 balance on ledger: ", r_balance);
 
-    // const num_blocks = 25000n;
-    // let my_block_args = [
-    //   {start:0n,length: num_blocks},
-    // ];
-
-    // let my_blocks = await can_ledger.icrc3_get_blocks(my_block_args);
-
-    // console.log("number of blocks:",my_blocks);
-    
-    //start reader
-    //do some waiting
-    await passTime(200);
+    await passTime(10);
 
     let r_balance2 = await can_noarchive.icrc1_balance_of(my_account);
     console.log("John0 balance on noarchive: ", r_balance2);
 
-    // expect(r_balance).toBe(r_balance2);
+    expect(r_balance).toBe(r_balance2);
 
   },600000);
 
