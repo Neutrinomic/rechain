@@ -1,6 +1,6 @@
 [package]
 name = "rechain"
-version = "1.1.0"
+version = "1.1.1"
 description = "Rechain"
 repository = "https://github.com/neutrinomic/rechain"
 keywords = [ "history", "events", "icrc3", "archive" ]
