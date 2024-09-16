@@ -188,14 +188,21 @@ actor Self {//KeyValue(phonebook : Nat){
 
     };
 
+    // public func dispatch(x: T.Action): () {
+    //     //return icrc3().add_record<system>(x, null);
+
+    //     let ret = chain.dispatch(x);  //handle error
+    //     //add block to ledger
+    // };
+
     public query func icrc1_balance_of(acc: ICRC.Account) : async Nat {
         balances.get(acc)
     };
  
     public type DispatchResult = {#Ok : Nat;  #Err: T.ActionError };
 
-    public func dispatch(actions: [T.Action]): async [DispatchResult] {
-        Array.map(actions, func(x: T.Action): DispatchResult = chain.dispatch(x));
-    };
+    // public func dispatch(actions: [T.Action]): async [DispatchResult] {
+    //     Array.map(actions, func(x: T.Action): DispatchResult = chain.dispatch(x));
+    // };
 
 };

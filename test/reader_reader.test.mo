@@ -27,8 +27,44 @@ import Text "mo:base/Text";
 //ILDE reader NEW
 import reader "../src/reader";
 import Error "mo:base/Error";
+import noarchive "../src/noarchive";
 
-actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = Self {
+actor class reader_reader(ledger_pid : Principal) = Self {//, noarchive_pid : Principal) = Self {
+    // -- Ledger configuration
+    let config_noarchive : T.Config = {
+        var TX_WINDOW  = 86400_000_000_000;  // 24 hours in nanoseconds
+        var PERMITTED_DRIFT = 60_000_000_000;
+        var FEE = 0;//1_000; ILDE: I make it 0 to simplify testing
+        var MINTING_ACCOUNT = {
+            owner = Principal.fromText("aaaaa-aa");
+            subaccount = null;
+            }
+    };
+
+    // -- Reducer : Balances
+    stable let balances_mem = Balances.Mem();
+    let balances = Balances.Balances({
+        config = config_noarchive;
+        mem = balances_mem;
+    });
+
+    // -- Reducer : Deduplication
+
+    stable let dedup_mem = Deduplication.Mem();
+    let dedup = Deduplication.Deduplication({
+        config = config_noarchive;
+        mem = dedup_mem;
+    });
+
+    // -- Chain
+
+    stable let chain_mem = noarchive.Mem();
+    var chain = noarchive.RechainNoArchive<T.Action, T.ActionError>({ 
+        //settings = ?{rechain.DEFAULT_SETTINGS with supportedBlocks = [];maxActiveRecords = 60; settleToRecords = 30; maxRecordsInArchiveInstance = 100;};
+        mem = chain_mem;
+        //encodeBlock = encodeBlock;
+        reducers = [balances.reducer];//, dedup.reducer];//, balancesIlde.reducer];  
+    });
 
     func decodeBlock(block: ?Trechain.Value) : T.Action {      
         
@@ -183,22 +219,22 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
         action.ts;
     };
 
-    func myOnRead(actions: [T.Action]): async () {
+    func myOnRead(actions: [T.Action]): () {
         var i = 0;
         var err : T.NoArchiveDispatchReturn = #Ok(0);
-        let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;
+        //let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;
 
         for(action in actions.vals()) {
-            try{
-                err := await noarchive.add_record(action);
-            } catch e {Debug.print("IMHERE2");Debug.print("rerror:"#debug_show(Error.code(e))#", e message:"#debug_show(Error.message(e)));};
+            //try{
+                let ret = chain.dispatch(action);   // <---------call a sync dispatch 
+            //} catch e {Debug.print("IMHERE2");Debug.print("rerror:"#debug_show(Error.code(e))#", e message:"#debug_show(Error.message(e)));};
         
             i := i+1;
         };
     };
 
-    func myOnReadNew(actions: [T.Action], id_nat : Nat): async () {
-        await myOnRead(actions);
+    func myOnReadNew(actions: [T.Action], id_nat : Nat): () {
+        myOnRead(actions);
     };
 
     func onError(error_text: Text) {   //ILDE: TBD: use SysLog
@@ -226,6 +262,7 @@ actor class reader_reader(ledger_pid : Principal, noarchive_pid : Principal) = S
         onReadNew = myOnReadNew;
         decodeBlock = decodeBlock;       //ILDE:Block -> ?Block for convenience in conversions
         getTimeFromAction = getTimeFromAction;
+        maxParallelRequest = 40;
     });
     
     //let noarchive = actor (Principal.toText(noarchive_pid)) : T.NoArchiveInterface;

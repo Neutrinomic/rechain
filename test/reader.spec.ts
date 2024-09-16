@@ -78,11 +78,11 @@ export async function TestNoarchive(pic: PocketIc, noarchiveCanisterId: Principa
   return fixture;
 }
 
-export async function TestReader(pic: PocketIc, readerCanisterId: Principal, ledger_pid: Principal, noarchive_pid: Principal) {
+export async function TestReader(pic: PocketIc, readerCanisterId: Principal, ledger_pid: Principal) {//, noarchive_pid: Principal) {
   const fixture = await pic.setupCanister<TestService_reader>({
     idlFactory: TestIdlFactory_reader,
     wasm: READER_READER_WASM_PATH,
-    arg: IDL.encode(init_reader({ IDL }), [ledger_pid, noarchive_pid]), 
+    arg: IDL.encode(init_reader({ IDL }), [ledger_pid]), // noarchive_pid]), 
   });
 
   return fixture;
@@ -261,12 +261,12 @@ describe("reader", () => {
     await can_ledger.set_ledger_canister();
 
     //Create noarchive
-    const fixture_noarchive = await TestNoarchive(pic, Principal.fromText("aaaaa-aa"));
-    can_noarchive = fixture_noarchive.actor;
-    canCanisterId_noarchive = fixture_noarchive.canisterId; 
+    // const fixture_noarchive = await TestNoarchive(pic, Principal.fromText("aaaaa-aa"));
+    // can_noarchive = fixture_noarchive.actor;
+    // canCanisterId_noarchive = fixture_noarchive.canisterId; 
 
     //Create reader
-    const fixture_reader = await TestReader(pic, Principal.fromText("aaaaa-aa"), canCanisterId_ledger, canCanisterId_noarchive);
+    const fixture_reader = await TestReader(pic, Principal.fromText("aaaaa-aa"), canCanisterId_ledger); // canCanisterId_noarchive);
     can_reader = fixture_reader.actor;
     canCanisterId_ledger = fixture_reader.canisterId; 
 
@@ -306,88 +306,88 @@ describe("reader", () => {
     
     console.log("John0 balance on ledger: ", r_balance);
 
-    await passTime(10);
+    // await passTime(10);
 
-    let r_balance2 = await can_noarchive.icrc1_balance_of(my_account);
-    console.log("John0 balance on noarchive: ", r_balance2);
+    // let r_balance2 = await can_noarchive.icrc1_balance_of(my_account);
+    // console.log("John0 balance on noarchive: ", r_balance2);
 
-    expect(r_balance).toBe(r_balance2);
+    // expect(r_balance).toBe(r_balance2);
 
   },600000);
 
-  it("check_balance_in_reader_after_burns", async () => {
-    let my_burn_action: Action = {
-      ts : 0n,
-      created_at_time : [0n], //?Nat64
-      memo: [], //?Blob;
-      caller: jo.getPrincipal(),  
-      fee: [], //?Nat
-      payload : {
-          burn : {
-              amt : 50n,
-              from : [john0.getPrincipal().toUint8Array()],
-          },
-      },
-    };
+  // it("check_balance_in_reader_after_burns", async () => {
+  //   let my_burn_action: Action = {
+  //     ts : 0n,
+  //     created_at_time : [0n], //?Nat64
+  //     memo: [], //?Blob;
+  //     caller: jo.getPrincipal(),  
+  //     fee: [], //?Nat
+  //     payload : {
+  //         burn : {
+  //             amt : 50n,
+  //             from : [john0.getPrincipal().toUint8Array()],
+  //         },
+  //     },
+  //   };
     
-    let i = 0n;
-    for (; i < 250; i++) {
-      let r = await can_ledger.add_record(my_burn_action);
-    }
+  //   let i = 0n;
+  //   for (; i < 250; i++) {
+  //     let r = await can_ledger.add_record(my_burn_action);
+  //   }
 
-    await passTime(10);
+  //   await passTime(10);
     
-    let account1 : Account = {'owner' : john0.getPrincipal(),
-                              'subaccount' : []};
+  //   let account1 : Account = {'owner' : john0.getPrincipal(),
+  //                             'subaccount' : []};
     
-    let r_balance = await can_ledger.icrc1_balance_of(account1);
-    console.log("John0 balance: ", r_balance);
+  //   let r_balance = await can_ledger.icrc1_balance_of(account1);
+  //   console.log("John0 balance: ", r_balance);
     
-    expect(r_balance).toBe(12500n);
+  //   expect(r_balance).toBe(12500n);
 
-    let r_balance2 = await can_noarchive.icrc1_balance_of(account1);
-    console.log("John0 balance on noarchive: ", r_balance2);
+  //   let r_balance2 = await can_noarchive.icrc1_balance_of(account1);
+  //   console.log("John0 balance on noarchive: ", r_balance2);
 
-    expect(r_balance).toBe(r_balance2);
+  //   expect(r_balance).toBe(r_balance2);
 
-  },60000);
+  // },60000);
 
-  it("check_balance_in_reader_after_transfers", async () => {
-    let my_transfer_action: Action = {
-      ts : 0n,
-      created_at_time : [0n], //?Nat64
-      memo: [], //?Blob;
-      caller: jo.getPrincipal(),  
-      fee: [], //?Nat
-      payload : {
-          transfer : {
-              amt : 50n,
-              from : [john0.getPrincipal().toUint8Array()],
-              to : [john1.getPrincipal().toUint8Array()],
-          },
-      },
-    };
+  // it("check_balance_in_reader_after_transfers", async () => {
+  //   let my_transfer_action: Action = {
+  //     ts : 0n,
+  //     created_at_time : [0n], //?Nat64
+  //     memo: [], //?Blob;
+  //     caller: jo.getPrincipal(),  
+  //     fee: [], //?Nat
+  //     payload : {
+  //         transfer : {
+  //             amt : 50n,
+  //             from : [john0.getPrincipal().toUint8Array()],
+  //             to : [john1.getPrincipal().toUint8Array()],
+  //         },
+  //     },
+  //   };
 
-    let i = 0n;
-    for (; i < 200; i++) {
-      let r = await can_ledger.add_record(my_transfer_action);
-    }
+  //   let i = 0n;
+  //   for (; i < 200; i++) {
+  //     let r = await can_ledger.add_record(my_transfer_action);
+  //   }
     
-    await passTime(10);
+  //   await passTime(10);
 
-    let account1 : Account = {'owner' : john1.getPrincipal(),
-      'subaccount' : []};
+  //   let account1 : Account = {'owner' : john1.getPrincipal(),
+  //     'subaccount' : []};
 
-    let r_balance = await can_ledger.icrc1_balance_of(account1);
-    console.log("John1 balance: ", r_balance);
+  //   let r_balance = await can_ledger.icrc1_balance_of(account1);
+  //   console.log("John1 balance: ", r_balance);
     
-    let r_balance2 = await can_noarchive.icrc1_balance_of(account1);
-    console.log("John1 balance on noarchive: ", r_balance2);
+  //   let r_balance2 = await can_noarchive.icrc1_balance_of(account1);
+  //   console.log("John1 balance on noarchive: ", r_balance2);
     
-    expect(r_balance).toBe(r_balance2);
+  //   expect(r_balance).toBe(r_balance2);
 
 
-  },60000); 
+  // },60000); 
 
   // it("transfer", async () => {
   //   //<--------

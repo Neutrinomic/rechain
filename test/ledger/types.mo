@@ -63,6 +63,7 @@ module {
     public type NoArchiveDispatchReturn = { #Ok : Nat; #Err : ActionError };
     public type NoArchiveInterface = actor {
       add_record : shared (Action) -> async (NoArchiveDispatchReturn);
+      //dispatch : shared (Action) -> ();
     };
 
 

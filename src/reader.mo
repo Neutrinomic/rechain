@@ -61,10 +61,11 @@ module {
         start_from_block: {#id:Nat; #last};
         onError : (Text) -> (); // If error occurs during following and processing it will return the error
         onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
-        onRead : [A] -> async ();
-        onReadNew : ([A], Nat) -> async ();  //ILDE: I am not sure what this new paramter is meant for (why do we pass 'mem.last_indexed_tx'?)
+        onRead : [A] -> ();
+        onReadNew : ([A], Nat) -> ();  //ILDE: I am not sure what this new paramter is meant for (why do we pass 'mem.last_indexed_tx'?)
         decodeBlock : (?Block) -> A;       //ILDE:Block 
         getTimeFromAction : A -> Nat64;    //ILDE:added
+        maxParallelRequest : Nat; // 40 is the default maximum number of parallel request
     }) {
         var started = false; // If this flag is off, the reader does nothing
 
@@ -107,7 +108,7 @@ module {
 
             let rez = await ledger.icrc3_get_blocks([{//get_transactions({
                 start = mem.last_indexed_tx;
-                length = maxTransactionsInCall * 40; //ILDE: new constant 2000*40 (before 1000)
+                length = maxTransactionsInCall * maxParallelRequest; //ILDE: new constant 2000*40 (before 1000)
             }]);
             //NEWILDE
 
@@ -119,7 +120,7 @@ module {
 
                 let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
  
-                await onReadNew(decoded_actions, mem.last_indexed_tx);
+                onReadNew(decoded_actions, mem.last_indexed_tx);
           
                 mem.last_indexed_tx += rez.blocks.size();//transactions.size();
 
@@ -151,7 +152,7 @@ module {
                     let args = atx.args;
                     let args_maxsize = Vector.new<[GetBlocksRequest]>();
                     for (arg in args.vals()) {
-                        let arg_starts = Array.tabulate<Nat>(Nat.min(40, 1 + arg.length/maxTransactionsInCall), func(i) = arg.start + i*maxTransactionsInCall); //ILDE: THIS seems an overkill
+                        let arg_starts = Array.tabulate<Nat>(Nat.min(maxParallelRequest, 1 + arg.length/maxTransactionsInCall), func(i) = arg.start + i*maxTransactionsInCall); //ILDE: THIS seems an overkill
                         //ILDE: where is this 40 coming from???
                         let arg_starts_bound = Array.map<Nat, GetBlocksRequest>( arg_starts, func(i) = {start = i; length = if (i - arg.start:Nat+maxTransactionsInCall <= arg.length) maxTransactionsInCall else arg.length + arg.start - i } );
                         Vector.add(args_maxsize, arg_starts_bound,);
@@ -244,7 +245,7 @@ module {
                     let sorted_blocks = sortBlocksById(u.transactions);
                     let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
           
-                    await onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);
+                    onReadNew(decoded_actions, mem.last_indexed_tx);//rez.blocks);//transactions);
                   
                     mem.last_indexed_tx += u.transactions.size();
 
@@ -257,7 +258,7 @@ module {
 
                     let sorted_blocks = sortBlocksById(rez.blocks);
                     let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
-                    await onReadNew(decoded_actions, mem.last_indexed_tx);
+                    onReadNew(decoded_actions, mem.last_indexed_tx);
 
                     mem.last_indexed_tx += rez.blocks.size();//transactions.size();
 
@@ -307,7 +308,7 @@ module {
 
                 let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
 
-                await onRead(decoded_actions);//rez.blocks);//transactions);
+                onRead(decoded_actions);//rez.blocks);//transactions);
                 
                 mem.last_indexed_tx += rez.blocks.size();//transactions.size();
                 if (rez.blocks.size() < 1000) {//transactions.size() < 1000) {
@@ -391,7 +392,7 @@ module {
                     let sorted_blocks = sortBlocksById(rez.blocks);
                     let decoded_actions: [A] = Array.map<?Block,A>(sorted_blocks, decodeBlock);
 
-                    await onRead(decoded_actions);//rez.blocks);//transactions);
+                    onRead(decoded_actions);//rez.blocks);//transactions);
                     //onRead(rez.transactions);
                     mem.last_indexed_tx += rez.blocks.size();
                 };
