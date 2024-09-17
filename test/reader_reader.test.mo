@@ -279,6 +279,10 @@ actor class reader_reader(ledger_pid : Principal) = Self {//, noarchive_pid : Pr
     public func stop_timer(): async () {
          await my_reader.stop_timer_flag();
     };
+
+    public query func icrc1_balance_of(acc: ICRC.Account) : async Nat {
+        balances.get(acc);
+    };
     
 
 };
