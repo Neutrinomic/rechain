@@ -19,12 +19,9 @@ import {
 } from "./build/cert.idl.js";
 import { HttpAgent, compare, lookup_path } from '@dfinity/agent';
 import { verifyCertification } from '@dfinity/certificate-verification';
-//import { backend, canisterId } from './build';
 
-// ILDE import {ICRCLedgerService, ICRCLedger} from "./icrc_ledger/ledgerCanister";
 //@ts-ignore
 import { toState } from "@infu/icblast";
-// Jest can't handle multi threaded BigInts o.O That's why we use toState
 
 const WASM_PATH = resolve(__dirname, "./build/cert.wasm");
 export async function TestCan(pic:PocketIc) {
@@ -52,38 +49,29 @@ describe("Cert", () => {
   
   beforeAll(async () => {
 
-    // const nnsSubnet = pic.getNnsSubnet();
-    // if (!nnsSubnet) {
-    //   throw new Error('NNS subnet not found');
-    // }
-
     pic = await PocketIc.create(process.env.PIC_URL, {nns:true}); 
-
 
     const fixture = await TestCan(pic);
     can = fixture.actor;
     canCanisterId = fixture.canisterId; 
 
-
     await pic.resetTime();
     const time = await pic.getTime();
     console.log("date", new Date(time));
-    // await can.set_ledger_canister();
 
-    //await can.set_ledger_canister();
   });
 
   afterAll(async () => {
-    await pic.tearDown(); //ILDE: this means "it removes the replica"
+    await pic.tearDown(); 
   });
 
   it("test_mintblock_cert1", async () => {
     let my_mint_action: Action = {
       ts : 0n,
-      created_at_time : [0n], //?Nat64
-      memo: [], //?Blob;
+      created_at_time : [0n],
+      memo: [], 
       caller: jo.getPrincipal(),  
-      fee: [], //?Nat
+      fee: [], 
       payload : {
           mint : {
               amt : 50n,
@@ -94,9 +82,6 @@ describe("Cert", () => {
     let r_mint = await can.add_record(my_mint_action);
     expect(true).toBe('Ok' in r_mint);
 
-    // const subnets = pic.getApplicationSubnets();
-    // const pubKey = await pic.getPubKey(subnets[0].id);
-
     const nnsSubnet = pic.getNnsSubnet();
     if (!nnsSubnet) {
       throw new Error('NNS subnet not found');
@@ -106,17 +91,13 @@ describe("Cert", () => {
 
     
 
-    let data_cert: []|[DataCertificate] = await can.icrc3_get_tip_certificate();// : async ?Trechain.DataCertificate 
+    let data_cert: []|[DataCertificate] = await can.icrc3_get_tip_certificate(); 
     if (data_cert != null) {
       let ddddd: undefined|DataCertificate = data_cert[0];
       if (typeof ddddd != "undefined") {
         const certificate = ddddd.certificate;
         const witness = ddddd.hash_tree;
-        //console.log("certificate:", certificate, ", witness:", witness);
-        // const agent = new HttpAgent();
-        // await agent.fetchRootKey();
 
-        
         let inputs = {
               canisterId: canCanisterId,
               encodedCertificate: new Uint8Array(certificate),
@@ -144,26 +125,10 @@ describe("Cert", () => {
           maxCertificateTimeOffsetMs: 50000,
         });
 
-        // const treeHash = lookup_path(['count'], tree);
-        // if (!treeHash) {
-        //   throw new Error('Count not found in tree');
-        // }
-
-        // const responseHash = await hashUInt32(count);
-        // if (!(treeHash instanceof ArrayBuffer) || !equal(responseHash, treeHash)) {
-        //   throw new Error('Count hash does not match');
-        // }
-
-        // countElement.innerText = String(count);
-
-
-
         console.log("cert: ", ddddd.certificate);
       };
     };
   });
-
-  
 
   async function passTime(n: number) {
     for (let i = 0; i < n; i++) {

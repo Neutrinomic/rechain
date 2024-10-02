@@ -87,7 +87,6 @@ shared ({ caller = ledger_canister_id }) actor class archive (_args : ?T.Archive
       for(thisItem in Iter.range(thisArg.start, thisArg.start + thisArg.length - 1)){
         switch(_get_transaction(thisItem)){
           case(null){
-            //should be unreachable...do we return an error?
           };
           case(?val){
             var aux: ?(T.Value) = ?val;

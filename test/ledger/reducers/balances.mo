@@ -1,13 +1,8 @@
 import Map "mo:map/Map";
-import Result "mo:base/Result";
-import Sha256 "mo:sha2/Sha256";
 import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
 import Blob "mo:base/Blob";
 import Chain "../../../src/lib";
-import U "../utils";
 import ICRC "../icrc";
 import T "../types";
 
@@ -21,7 +16,7 @@ module {
         accounts = Map.new<Blob, Nat>();
     };
 
-    public class Balances({ mem : Mem; config:T.Config }) {   //<---
+    public class Balances({ mem : Mem; config:T.Config }) {   
 
         public func reducer(action : T.Action) : Chain.ReducerResponse<T.ActionError> {
 

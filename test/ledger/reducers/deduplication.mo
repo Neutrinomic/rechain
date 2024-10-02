@@ -1,10 +1,7 @@
 import Map "mo:map/Map";
-import Result "mo:base/Result";
 import Sha256 "mo:sha2/Sha256";
 import Principal "mo:base/Principal";
 import Nat "mo:base/Nat";
-import Array "mo:base/Array";
-import Debug "mo:base/Debug";
 import Blob "mo:base/Blob";
 import Chain "../../../src/lib";
 import U "../utils";

@@ -23,5 +23,4 @@ module {
         Vec.reverse<Nat8>(buffer);
         return Blob.fromArray(Vec.toArray<Nat8>(buffer));
     };
-
 };

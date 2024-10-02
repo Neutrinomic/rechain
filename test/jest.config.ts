@@ -1,13 +1,3 @@
-//ILDE
-// import type { Config } from 'jest';
-
-// const config: Config = {
-//   watch: false,
-//   preset: 'ts-jest/presets/js-with-ts',
-//   testEnvironment: 'node',
-// };
-
-// export default config;
 import type { Config } from 'jest';
 
 const config: Config = {
@@ -18,7 +8,7 @@ const config: Config = {
   globalTeardown: '<rootDir>/global-teardown.ts',
   testTimeout: 30_000,
   transformIgnorePatterns: [
-    '/node_modules/(?!@dfinity/agent|@dfinity/certificate-verification)' // Add other modules as necessary
+    '/node_modules/(?!@dfinity/agent|@dfinity/certificate-verification)' 
   ]
 };
 

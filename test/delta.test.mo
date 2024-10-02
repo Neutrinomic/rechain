@@ -6,7 +6,6 @@ import Nat64 "mo:base/Nat64";
 import Timer "mo:base/Timer";
 import Vector "mo:vector";
 import Time "mo:base/Time";
-import Mgr "./services/mgr";
 
 actor class Delta({archive_controllers: [Principal]}) = this {
 
@@ -62,18 +61,13 @@ actor class Delta({archive_controllers: [Principal]}) = this {
         settings = ?{rechain.DEFAULT_SETTINGS with supportedBlocks = []; maxActiveRecords = 100; settleToRecords = 30; maxRecordsInArchiveInstance = 120; archiveControllers = archive_controllers};
         mem = chain_mem;
         encodeBlock = encodeBlock;
-        // reducers = [balances .reducer, dedup .reducer];//, balances .reducer];      //<-----REDO
         reducers = [];
     });
     
     ignore Timer.setTimer<system>(#seconds 0, func () : async () {
-        //await chain.start_archiving<system>();
         await chain.start_timers<system>();
     });
-    // -----
     
-
-
     public query func icrc3_get_blocks(args: rechain.GetBlocksArgs): async rechain.GetBlocksResult {
         return chain.get_blocks(args);
     };
@@ -90,8 +84,6 @@ actor class Delta({archive_controllers: [Principal]}) = this {
         chain_mem.canister := ?Principal.fromActor(this);
     };
 
-
-    // Autoupgrade every time this canister is upgraded
     ignore Timer.setTimer<system>(#seconds 1, func () : async () {
         await chain.upgrade_archives();
     });
@@ -113,8 +105,5 @@ actor class Delta({archive_controllers: [Principal]}) = this {
     public query func last_modified(): async Time.Time {
         canister_last_modified;
     };
-
-
-
 
 };

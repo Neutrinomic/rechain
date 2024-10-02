@@ -1,52 +1,35 @@
-import Map "mo:map/Map";
 import Principal "mo:base/Principal";
 import ICRC "./ledger/icrc";
-import U "./ledger/utils";
 import Array "mo:base/Array";
 import Blob "mo:base/Blob";
-import SWB "mo:swbstable";
 import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
-//import Deduplication "./reducers/deduplication";
 import Deduplication "./ledger/reducers/deduplication";
 import T "./ledger/types";
-import Trechain "../src/types";
-//import Balances "reducers/balances";
 import Balances "./ledger/reducers/balances";
-import Sha256 "mo:sha2/Sha256";
-//ILDE
 import rechain "../src/lib";
 import Vec "mo:vector";
 import Nat64 "mo:base/Nat64";
 import RepIndy "mo:rep-indy-hash";
 import Timer "mo:base/Timer";
-import ExperimentalCycles "mo:base/ExperimentalCycles";
-import Iter "mo:base/Iter";
 import Text "mo:base/Text";
 
-actor Self {//KeyValue(phonebook : Nat){
-
-
-
-    // -- Ledger configuration
+actor Self {
     let config : T.Config = {
-        var TX_WINDOW  = 86400_000_000_000;  // 24 hours in nanoseconds
+        var TX_WINDOW  = 86400_000_000_000;  
         var PERMITTED_DRIFT = 60_000_000_000;
-        var FEE = 0;//1_000; ILDE: I make it 0 to simplify testing
+        var FEE = 0;
         var MINTING_ACCOUNT = {
             owner = Principal.fromText("aaaaa-aa");
             subaccount = null;
             }
     };
 
-    // -- Reducer : Balances
     stable let balances_mem = Balances.Mem();
     let balances = Balances.Balances({
         config;
         mem = balances_mem;
     });
-
-    // -- Reducer : Deduplication
 
     stable let dedup_mem = Deduplication.Mem();
     let dedup = Deduplication.Deduplication({
@@ -54,10 +37,7 @@ actor Self {//KeyValue(phonebook : Nat){
         mem = dedup_mem;
     });
 
-    // -- Chain
-
     stable let chain_mem = rechain.Mem();
-
 
     func encodeBlock(b: T.Action) : ?[rechain.ValueMap] {
 
@@ -174,7 +154,7 @@ actor Self {//KeyValue(phonebook : Nat){
         settings = ?{rechain.DEFAULT_SETTINGS with supportedBlocks = [];maxActiveRecords = 60; settleToRecords = 30; maxRecordsInArchiveInstance = 100;};
         mem = chain_mem;
         encodeBlock = encodeBlock;
-        reducers = [balances.reducer];//, dedup.reducer];//, balancesIlde.reducer];  
+        reducers = [balances.reducer]; 
     });
 
     public shared(msg) func check_archives_balance(): async () {
@@ -184,35 +164,23 @@ actor Self {//KeyValue(phonebook : Nat){
     ignore Timer.setTimer<system>(#seconds 0, func () : async () {
         Debug.print("inside setTimer");
         await chain.start_timers<system>();
-
-        //await chain.start_archiveCycleMaintenance<system>(); 
     });
 
     public shared(msg) func set_ledger_canister(): async () {
         chain_mem.canister := ?Principal.fromActor(Self);
-        //chain.set_ledger_canister(Principal.fromActor(this));
     };
 
     public shared(msg) func print_ledger () {
         Debug.print("print_ledger");
         Debug.print(debug_show(chain_mem.lastIndex));
-        //Debug.print(debug_show(chain_mem.history));
-        
         Debug.print("ENDPRINTLEDGR");
     };
 
     public shared(msg) func add_record(x: T.Action): async (DispatchResult) {
-        //return icrc3().add_record<system>(x, null);
-
-        let ret = chain.dispatch(x);  //handle error
-        //add block to ledger
-
+        let ret = chain.dispatch(x); 
         return ret;
-
-
     };
 
-    // ICRC-1
     public shared ({ caller }) func icrc1_transfer(req : ICRC.TransferArg) : async ICRC.Result {
         let ret = transfer(caller, req);
         ret;

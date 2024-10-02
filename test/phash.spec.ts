@@ -20,7 +20,6 @@ import {
 
 //@ts-ignore
 import { toState } from "@infu/icblast";
-// Jest can't handle multi threaded BigInts o.O That's why we use toState
 
 const WASM_PATH = resolve(__dirname, "./build/phash.wasm");
 
@@ -34,19 +33,17 @@ export async function TestCan(pic: PocketIc, ledgerCanisterId: Principal) {
   return fixture;
 }
 
-
 function decodeBlock2(my_blocks:GetTransactionsResult, block_pos:number ) {
-  // console.log(my_blocks.blocks[0]);
   let my_phash;
   let my_auxm1;
   let my_block_id = -1n;
   let my_block_ts = -1n;
   let my_created_at_time = -1n;
-  let my_memo;//: Uint8Array | number[];
-  let my_caller;//: Uint8Array | number[];
+  let my_memo;
+  let my_caller;
   let my_fee = -1n;
   let my_btype = '???';
-  let my_payload_amt = -1n;//', { Map: [Array] } ]
+  let my_payload_amt = -1n;
   let my_payload_to;
   let my_payload_from;
 
@@ -63,7 +60,6 @@ function decodeBlock2(my_blocks:GetTransactionsResult, block_pos:number ) {
     if ('Map' in aux) {
       const aux2 = aux.Map;
       for (let i = 0; i < aux2.length; i++) {
-        // phash, ts, btype, tx (created_at_time, memo, caller, fee, payload (amt, from, to))
         switch(aux2[i][0]) {
           case 'phash':
             const aux_phash = aux2[i][1];
@@ -88,7 +84,6 @@ function decodeBlock2(my_blocks:GetTransactionsResult, block_pos:number ) {
             if ('Map' in aux_tx_aux) {
               const aux_tx = aux_tx_aux.Map;
               for (let j = 0; j < aux_tx.length; j++) {
-                //(created_at_time, memo, caller, fee, payload (amt, from, to)
                 switch(aux_tx[j][0]) {
                   case 'created_at_time':
                     const cat_aux = aux_tx[j][1]
@@ -115,7 +110,6 @@ function decodeBlock2(my_blocks:GetTransactionsResult, block_pos:number ) {
                     }
                     break;
                   case 'payload':
-                    // amt, from, to
                     const pay_aux = aux_tx[j][1]
                     if ('Map' in pay_aux) {
                       const pay_aux_map = pay_aux.Map;
@@ -163,136 +157,14 @@ function decodeBlock2(my_blocks:GetTransactionsResult, block_pos:number ) {
     block_id: my_block_id,
     block_ts: my_block_ts,
     created_at_time: my_created_at_time,
-    memo: my_memo,//: Uint8Array | number[];
-    caller: my_caller,//: Uint8Array | number[];
+    memo: my_memo,
+    caller: my_caller,
     fee: my_fee,
     btype: my_btype,
-    payload_amt: my_payload_amt,//', { Map: [Array] } ]
-    payload_to: my_payload_to,//: Uint8Array | number[];
-    payload_from: my_payload_from});//: Uint8Array | number[];
+    payload_amt: my_payload_amt,
+    payload_to: my_payload_to,
+    payload_from: my_payload_from});
 };
-
-// function decodeBlock(my_blocks:GetTransactionsResult, block_pos:number ) {
-//   // console.log(my_blocks.blocks[0]);
-//   let my_phash;
-//   let my_auxm1;
-//   let my_block_id = -1n;
-//   let my_block_ts = -1n;
-//   let my_created_at_time = -1n;
-//   let my_memo;//: Uint8Array | number[];
-//   let my_caller;//: Uint8Array | number[];
-//   let my_fee = -1n;
-//   let my_btype = '???';
-//   let my_payload_amt = -1n;//', { Map: [Array] } ]
-//   let my_payload_to;
-//   let my_payload_from;
-
-//   //let aux: Value__1|undefined;
-//   // if (my_blocks.blocks[0].block[0] !== undefined) {
-      
-//   //   const aux: Value__1 = my_blocks.blocks[0].block[0];
-
-//   console.log("my_blocks:",my_blocks);
-//   if (my_blocks.blocks[block_pos].block[0] !== undefined) {
-//     //console.log("my_blocks.blocks[block_pos].block[0]:",my_blocks.blocks[block_pos].block[0]);
-//     console.log("my_blocks.blocks[block_pos].block[0]:",my_blocks.blocks[block_pos].block[0]);
-//     const aux: Value__1 = my_blocks.blocks[block_pos].block[0];
-//     if ('id' in my_blocks.blocks[block_pos]) {
-//       my_block_id = my_blocks.blocks[block_pos].id;
-//       console.log("my_block_id:",my_block_id);
-//     }
-//     if (block_pos>0) {
-//       if (my_blocks.blocks[block_pos-1].block[0] !== undefined) {
-//         my_auxm1 = my_blocks.blocks[block_pos-1].block[0];
-//         console.log ("my_auxm1:",my_auxm1);
-//       };
-//     }
-//     if ('Map' in aux) {
-//       console.log("aux:", aux);
-//       const aux2 = aux.Map;
-
-
-//       let auxaux = aux2[0][1];
-//       if (aux2.length>1) {
-//         auxaux = aux2[1][1];
-//         if ('Blob' in aux2[0][1]) {
-//           my_phash = aux2[0][1]['Blob'];
-//         };
-//       };
-//       if ('Map' in auxaux) {//aux2[0][1]) {
-//         const aux3 = auxaux;
-//         if ('Nat' in aux3.Map[0][1]) {
-//           my_block_ts = aux3.Map[0][1].Nat;
-//         }
-//         if ('Nat' in aux3.Map[1][1]) {
-//           my_created_at_time = aux3.Map[1][1].Nat;
-//         }
-//         if ('Blob' in aux3.Map[2][1]) {
-//           my_memo = aux3.Map[2][1].Blob;
-//         }
-//         if ('Blob' in aux3.Map[3][1]) {
-//           my_caller = aux3.Map[3][1].Blob;
-//         }
-//         if ('Nat' in aux3.Map[4][1]) {
-//           my_fee = aux3.Map[4][1].Nat;
-//         } 
-//         if ('Text' in aux3.Map[5][1]) {
-//           my_btype = aux3.Map[5][1].Text;
-//         } 
-//         if ('Map' in aux3.Map[6][1]) {
-//           const aux4 = aux3.Map[6][1];
-//           if ('Nat' in aux4.Map[0][1]) {
-//             my_payload_amt = aux4.Map[0][1].Nat;
-//           }
-//           if ('Array' in aux4.Map[1][1]) {
-//             if (aux4.Map[1][0] == 'to'){
-//               const aux5 = aux4.Map[1][1].Array;
-//               if ('Blob' in aux5[0]) {
-//                 my_payload_to = aux5[0].Blob
-//               }
-//             } else if (aux4.Map[1][0] == 'from'){
-//               const aux5 = aux4.Map[1][1].Array;
-//               if ('Blob' in aux5[0]) {
-//                 my_payload_from = aux5[0].Blob
-//               }
-//             }
-//           }
-//           if (typeof aux4.Map[2] != "undefined") {
-
-//             if ('Array' in aux4.Map[2][1]) {
-//               if (aux4.Map[2][0] == 'to'){
-//                 const aux5 = aux4.Map[2][1].Array;
-//                 if ('Blob' in aux5[0]) {
-//                   my_payload_to = aux5[0].Blob
-//                 }
-//               } else if (aux4.Map[2][0] == 'from'){
-//                 const aux5 = aux4.Map[2][1].Array;
-//                 if ('Blob' in aux5[0]) {
-//                   my_payload_from = aux5[0].Blob
-//                 }
-//               }
-//             }
-//           }
-//         } 
-//       }
-//     } 
-//   }
-
-//   return({auxm1: my_auxm1,
-//           phash: my_phash,
-//           block_id: my_block_id,
-//           block_ts: my_block_ts,
-//           created_at_time: my_created_at_time,
-//           memo: my_memo,//: Uint8Array | number[];
-//           caller: my_caller,//: Uint8Array | number[];
-//           fee: my_fee,
-//           btype: my_btype,
-//           payload_amt: my_payload_amt,//', { Map: [Array] } ]
-//           payload_to: my_payload_to,//: Uint8Array | number[];
-//           payload_from: my_payload_from});//: Uint8Array | number[];
-// };
-
-
 
 describe("phash", () => {
   let pic: PocketIc;
@@ -315,7 +187,7 @@ describe("phash", () => {
   
     
   beforeAll(async () => {
-    pic = await PocketIc.create(process.env.PIC_URL); //ILDE create();
+    pic = await PocketIc.create(process.env.PIC_URL); 
 
 
     const fixture = await TestCan(pic, Principal.fromText("aaaaa-aa"));
@@ -327,16 +199,16 @@ describe("phash", () => {
   });
 
   afterAll(async () => {
-    await pic.tearDown(); //ILDE: this means "it removes the replica"
+    await pic.tearDown(); 
   });
 
   it("check_burnblock_to", async () => {
     let my_mint_action: Action = {
       ts : 0n,
-      created_at_time : [0n], //?Nat64
-      memo: [], //?Blob;
+      created_at_time : [0n], 
+      memo: [], 
       caller: jo.getPrincipal(),  
-      fee: [], //?Nat
+      fee: [],
       payload : {
           mint : {
               amt : 50n,
@@ -358,9 +230,7 @@ describe("phash", () => {
     const decodedBlock0 = decodeBlock2(my_blocks,1); 
     const decodedBlock1 = decodeBlock2(my_blocks,1); 
     const decodedBlock2 = decodeBlock2(my_blocks,2); 
-    //console.log("decodedBlock0", decodedBlock0);
-    //console.log("decodedBlock1", decodedBlock1);
-    //console.log("decodedBlock2", decodedBlock2);
+
     const john0_to = john0.getPrincipal().toUint8Array();
 
     expect(true).toBe(JSON.stringify(john0_to) === JSON.stringify(decodedBlock1.payload_to));
@@ -379,70 +249,11 @@ describe("phash", () => {
    
   });
 
-  // it("check_archives_balance", async () => {
-       
-    
-  //   let my_mint_action: Action = {
-  //     ts : 0n,
-  //     created_at_time : [0n], //?Nat64
-  //     memo: [], //?Blob;
-  //     caller: jo.getPrincipal(),  
-  //     fee: [], //?Nat
-  //     payload : {
-  //         mint : {
-  //             amt : 50n,
-  //             to : [john0.getPrincipal().toUint8Array()],
-  //         },
-  //     },
-  //   };
-
-  //   let i = 0n;
-  //   for (; i < 35; i++) {
-  //     let r = await can.add_record(my_mint_action);
-  //     //console.log(i);
-  //   }
-  //   console.log(i);
-
-  //   await passTime(200);
-
-  //   i = 0n;
-  //   for (; i < 35; i++) {
-  //     let r = await can.add_record(my_mint_action);
-  //     //console.log(i);
-  //   }
-  //   console.log(i);
-
-  //   await passTime(200);
-    
-  //   await can.check_archives_balance();
-    
-  //   await passTime(200);
-
-  //   i = 0n;
-  //   for (; i < 35; i++) {
-  //     let r = await can.add_record(my_mint_action);
-  //     //console.log(i);
-  //   }
-  //   console.log(i);
-    
-  //   await passTime(200);
-    
-  //   const ret = await can.check_archives_balance();
-    
-  //   console.log(ret);
-
-  //   await passTime(200);
-
-  //   expect(true).toBe(true);
-   
-  // });
-
   async function passTime(n: number) {
     for (let i = 0; i < n; i++) {
       await pic.advanceTime(3 * 1000);
       await pic.tick(2);
     }
   }
-  
 });
 

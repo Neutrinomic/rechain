@@ -19,7 +19,6 @@ import CertTree "mo:ic-certification/CertTree";
 import MTree "mo:ic-certification/MerkleTree";
 import Option "mo:base/Option";
 import Utils "./utils";
-import Nat8 "mo:base/Nat8";
 import SysLog "./syslog";
 
 module {
@@ -34,9 +33,6 @@ module {
     cert_store : CertTree.Store;
     
     eventlog_mem : SWB.StableData<Text>;
-    //syslog : SysLog.SysLog;
-    //syslog : SWB.StableData<Text>;
-    //logMem : SWB.StableData<Text>;
   };
 
   public func memEventLog() : {_eventlog_mem: SWB.SlidingWindowBuffer<Text>} {
@@ -55,14 +51,9 @@ module {
       var firstIndex = 0;
       var canister = null;
       archives = Map.new<Principal, T.TransactionRange>();
-      cert_store = CertTree.newStore(); //Certificate tree storage
+      cert_store = CertTree.newStore(); 
 
-      eventlog_mem = SWB.SlidingWindowBufferNewMem<Text>();//SWB.SlidingWindowBufferNewMem<Text>();
-      //syslog = SysLog.SysLog(memEventLog());
-      //syslog = SysLog.SysLog({_eventlog_mem=SWB.SlidingWindowBuffer<Text>(SWB.SlidingWindowBufferNewMem<Text>())});//memEventLog());
-      
-      //syslog = SysLog.SysLog(memEventLog());
-      //syslog = SWB.SlidingWindowBufferNewMem<Text>();
+      eventlog_mem = SWB.SlidingWindowBufferNewMem<Text>();
     };
   };
 
@@ -111,8 +102,8 @@ module {
     let history = SWB.SlidingWindowBuffer<T.Value>(mem.history);
 
     let archiveState = {
-      var bCleaning = false; //It indicates whether a archival process is on or not (only 1 possible at a time)
-      var cleaningTimer : ?Nat = null; //This timer will be set once we reach a ledger size > maxActiveRecords (see mothod below)
+      var bCleaning = false; 
+      var cleaningTimer : ?Nat = null; 
       settings = Option.get(settings, DEFAULT_SETTINGS);
    
     };
@@ -120,15 +111,13 @@ module {
 
 
     public func dispatch(action : A) : ({ #Ok : BlockId; #Err : E }) {
-      // Execute reducers
       let reducerResponse = Array.map<ActionReducer<A, E>, ReducerResponse<E>>(reducers, func(fn) = fn(action));
-      // Check if any reducer returned an error and terminate if so
       let hasError = Array.find<ReducerResponse<E>>(reducerResponse, func(resp) = switch (resp) { case (#Err(_)) true; case (_) false });
 
       switch (hasError) { case (? #Err(e)) { return #Err(e) }; case (_) () };
       
       let blockId = mem.lastIndex + 1; 
-      // Execute state changes if no errors
+ 
       ignore Array.map<ReducerResponse<E>, ()>(reducerResponse, func(resp) { let #Ok(f) = resp else return (); f(blockId) });
 
       let encodedBlock: ?[T.ValueMap] = encodeBlock(action); 
@@ -137,36 +126,18 @@ module {
         case (null) {};
         case (?aux) {
           let encodedBlock_nonull: [T.ValueMap] = aux;
-          // create new empty block entry
           let trx = Vec.new<T.ValueMap>();
-          // Add phash to empty block (null if not the first block)
           ignore do ? {Vec.add(trx, ("phash", #Blob(mem.phash!)))};
-          // add encoded blockIlde to new block with phash
+      
           Vec.addFromIter(trx, encodedBlock_nonull.vals());
-          // covert vector to map to make it consistent with Value type
+   
           let thisTrx = #Map(Vec.toArray(trx));
           mem.phash := ?Blob.fromArray(RepIndy.hash_val(thisTrx));
           ignore history.add(thisTrx);
-
-           // certificate is computed using phash so, we only update the certificate if we update 
         };
       };
 
-      // // create new empty block entry
-      // let trx = Vec.new<T.ValueMap>();
-      // // Add phash to empty block (null if not the first block)
-      // ignore do ? {Vec.add(trx, ("phash", #Blob(mem.phash!)))};
-
-      // // add encoded blockIlde to new block with phash
-      // Vec.addFromIter(trx, encodedBlock.vals());
-      // // covert vector to map to make it consistent with Value type
-      // let thisTrx = #Map(Vec.toArray(trx));
-      // mem.phash := ?Blob.fromArray(RepIndy.hash_val(thisTrx));
-      // ignore history.add(thisTrx);
-      // //One we add the block, we need to increase the lastIndex
       mem.lastIndex := mem.lastIndex + 1;
-
-      // certificate is computed using phash and mem.lastIndex, so we ALWAYS update the certificate (at least mem.lastIndex changed) 
       dispatch_cert();
 
       #Ok(blockId);
@@ -190,7 +161,6 @@ module {
       if (ExperimentalCycles.balance() > archiveState.settings.archiveCycles * 2) {
         ExperimentalCycles.add<system>(archiveState.settings.archiveCycles);
       } else { 
-        //warning ledger will eventually overload
         Debug.print("Not enough cycles" # debug_show (ExperimentalCycles.balance()));
         archiveState.bCleaning := false;
         return null;
@@ -217,15 +187,6 @@ module {
 
     };
 
-    // public func fromNat(len : Nat, n : Nat) : [Nat8] {
-    //     let ith_byte = func(i : Nat) : Nat8 {
-    //         assert(i < len);
-    //         let shift : Nat = 8 * (len - 1 - i);
-    //         Nat8.fromIntWrap(n / 2**shift)
-    //     };
-    //     Array.tabulate<Nat8>(len, ith_byte)
-    // };
-
     private func dispatch_cert() : () {
       let ?latest_hash = mem.phash else return;
 
@@ -238,31 +199,21 @@ module {
 
     private func check_clean_up<system>() : async () {
       if (not started) return;
-      
-      //clear the timer
+
       archiveState.cleaningTimer := null;
 
-      //ensure only one cleaning job is running
-
       if (archiveState.bCleaning) {
-        return; //only one cleaning at a time;
       };
 
       if (history.len() < archiveState.settings.maxActiveRecords) {
         return;
       };
-      // let know that we are creating an archive canister so noone else try at the same time
       
       let archives = Iter.toArray(Map.entries<Principal, T.TransactionRange>(mem.archives));
-      //Debug.print("Size in clean_up: "#debug_show(archives.size()));
-
 
       archiveState.bCleaning := true;
 
-      //cleaning
-
       let (archive_detail, available_capacity) = if (Map.size(mem.archives) == 0) {
-        //no archive exists - create a new canister
        
         let ?newArchive = await new_archive<system>({
           maxRecords = archiveState.settings.maxRecordsInArchiveInstance;
@@ -273,8 +224,6 @@ module {
           return;
         };
 
-        //set archive controllers calls async
-
         let newItem = {
           start = 0;
           length = 0;
@@ -283,14 +232,11 @@ module {
         ignore Map.put<Principal, T.TransactionRange>(mem.archives, Map.phash, Principal.fromActor(newArchive), newItem);
         ((Principal.fromActor(newArchive), newItem), archiveState.settings.maxRecordsInArchiveInstance);
       } else {
-        // check that the last one isn't full;
         let lastArchive = switch (Map.peek(mem.archives)) {
-          //"If the Map is not empty, returns the last (key, value) pair in the Map. Otherwise, returns null.""
-          case (null) { Debug.trap("mem.archives unreachable") }; //unreachable;
+          case (null) { Debug.trap("mem.archives unreachable") }; 
           case (?val) val;
         };
         if (lastArchive.1.length >= archiveState.settings.maxRecordsInArchiveInstance) {
-          // last archive is full, create a new archive
 
           let ?newArchive = await new_archive({
             maxRecords = archiveState.settings.maxRecordsInArchiveInstance;
@@ -306,7 +252,6 @@ module {
           ignore Map.put(mem.archives, Map.phash, Principal.fromActor(newArchive), newItem);
           ((Principal.fromActor(newArchive), newItem), archiveState.settings.maxRecordsInArchiveInstance);
         } else {
-          //this is the case we reuse a previously/last create archive because there is free space
           let capacity = if (archiveState.settings.maxRecordsInArchiveInstance >= lastArchive.1.length) {
             Nat.sub(archiveState.settings.maxRecordsInArchiveInstance, lastArchive.1.length);
           } else {
@@ -325,9 +270,6 @@ module {
         Debug.trap("Settle to records must be equal or smaller than the size of the ledger upon clanup");
 
       };
-
-      // "bRbRecallAtEnd" is used to let know this function at the end, it still has work to do
-      //  we could not archive all ledger records. so we need to update "archive_amount"
 
       var bRecallAtEnd = false;
 
@@ -358,23 +300,19 @@ module {
         if (Vec.size(toArchive) == archive_amount) break find;
       };
 
-      // actually adding them
-
       try {
         let result = await archive.append_transactions(Vec.toArray(toArchive));
         let stats = switch (result) {
           case (#ok(stats)) stats;
           case (#Full(stats)) stats;
           case (#err(_)) {
-            //do nothing...it failed;
-            archiveState.bCleaning := false; //if error, we can desactivate bCleaning (set to True in the begining) and return (WHY!!!???)
+            archiveState.bCleaning := false; 
             return;
           };
         };
 
-        // remove those block already archived
         let archivedAmount = Vec.size(toArchive);
-        // remove "archived_amount" blocks from the imnitial history
+
         history.deleteTo(mem.firstIndex + archivedAmount);
         mem.firstIndex := mem.firstIndex + archivedAmount;
 
@@ -388,55 +326,15 @@ module {
           },
         );
       } catch (_) {
-        //what do we do when it fails?  keep them in memory?
         archiveState.bCleaning := false;
         return;
       };
-
-      // bCleaning :=false; to allow other timers to act
-      // check bRecallAtEnd=True to make it possible to finish non archived transactions with a new timer
-
       archiveState.bCleaning := false;
-
-      // ILDE: The following check is no longer necessary because "check_clean_up" is already executing every 30s 
-      // if (bRecallAtEnd) {
-      //   archiveState.cleaningTimer := ?Timer.setTimer<system>(#seconds(0), check_clean_up);
-      // };
 
       return;
     };
 
     public func start_timers<system>() : async () {
-      // let syslog = SysLog.SysLog({_eventlog_mem=mem.eventlog_mem});
-      // let archives = Iter.toArray(Map.entries<Principal, T.TransactionRange>(mem.archives));
-     
-      // for (i in archives.keys()) {
-      //   let (a,_) = archives[i];
-      //   try {
-      //     let archiveActor = actor (Principal.toText(a)) : T.ArchiveInterface;        
-      //     let archive_cycles : Nat = await archiveActor.cycles();
-              
-      //     if (archive_cycles < archiveState.settings.minArchiveCycles) {
-      //       if (ExperimentalCycles.balance() > archiveState.settings.archiveCycles * 2) { 
-              
-      //         let refill_amount = archiveState.settings.archiveCycles;
-      //         try{
-      //           ExperimentalCycles.add<system>(refill_amount);
-      //           await archiveActor.deposit_cycles();
-      //         } catch (err) {
-      //           syslog.add("Err : Failed to refill " # Principal.toText(a) # " width " # debug_show(refill_amount) # " : " # Error.message(err));
-      //         };
-      //       } else { 
-      //         //warning ledger will eventually overload
-      //         Debug.print("Err : Not enough cycles to replenish archive canisters " # debug_show (ExperimentalCycles.balance()));
-      //       };
-      //     };
-      //   }
-      //   catch(err) {
-      //     syslog.add("Err : Failed to get canister " # Principal.toText(a) # " : " # Error.message(err));
-      //   };
-      // };
-      // ignore Timer.setTimer<system>(#seconds(archiveState.settings.secsCycleMaintenance), start_archiveCycleMaintenance);
       if (started) Debug.trap("already started");
       started := true;
       
@@ -471,7 +369,6 @@ module {
                 syslog.add("Err : Failed to refill " # Principal.toText(a) # " width " # debug_show(refill_amount) # " : " # Error.message(err));
               };
             } else { 
-              //warning ledger will eventually overload
               Debug.print("Err : Not enough cycles to replenish archive canisters " # debug_show (ExperimentalCycles.balance()));
             };
           };
@@ -487,41 +384,23 @@ module {
       let syslog = SysLog.SysLog({_eventlog_mem=mem.eventlog_mem});
       
       let archives = Iter.toArray(Map.entries<Principal, T.TransactionRange>(mem.archives));
-      // Debug.print("Size in check: "#debug_show(archives.size()));
       for (i in archives.keys()) {
         let (a,_) = archives[i];
 
         let archiveActor = actor (Principal.toText(a)) : T.ArchiveInterface;
-        let archive_cycles : Nat = await archiveActor.cycles();
-        //Debug.print("Cycles b: " # debug_show(archive_cycles));      
+        let archive_cycles : Nat = await archiveActor.cycles(); 
         if (archive_cycles < archiveState.settings.minArchiveCycles) {
           if (ExperimentalCycles.balance() > archiveState.settings.archiveCycles * 2) { 
-            //Debug.print("replenish cycles");
             ExperimentalCycles.add<system>(archiveState.settings.archiveCycles);
             await archiveActor.deposit_cycles();
           } else { 
-            //warning ledger will eventually overload
             syslog.add("Err : Not enough cycles to replenish archive canisters " # debug_show (ExperimentalCycles.balance()));
             return;
           };
         };
-        //let archive_cyclesa : Nat = await archiveActor.cycles();
-        //Debug.print("Cycles a: " # debug_show(archive_cyclesa));
       };
       return;
     };
-
-    // public func start_archiving<system>() : async () {
-    //     //Debug.print("inside start_archiving,"#debug_show(history.len())#""#debug_show(archiveState.settings.maxActiveRecords));
-    //     if (history.len() > archiveState.settings.maxActiveRecords) {
-    //       if (Option.isNull(archiveState.cleaningTimer)) {
-    //           archiveState.cleaningTimer := ?Timer.setTimer<system>(#seconds(0), check_clean_up);
-    //       }
-    //     };
-
-    //     ignore Timer.setTimer<system>(#seconds(30), start_archiving);
-    //     //ignore Timer.recurringTimer<system>(#seconds 30, cycle);
-    // };
 
     public func stats() : T.Stats {
       return {
@@ -535,56 +414,47 @@ module {
       };
     };
 
-
-
     public func get_blocks(args : T.GetBlocksArgs) : T.GetBlocksResult {
       let local_ledger_length = history.len();
       let ledger_length = if (mem.lastIndex == 0 and local_ledger_length == 0) {
         0;
       } else {
-        mem.lastIndex; // + 1;
+        mem.lastIndex; 
       };
 
-      //get the transactions on this canister
       let transactions = Vec.new<T.ServiceBlock>();
 
       for (thisArg in args.vals()) {
         let start = if (thisArg.start + thisArg.length > mem.firstIndex) {
 
           let start = if (thisArg.start <= mem.firstIndex) {
-            mem.firstIndex; //"our sliding window first valid element is archiveState.firstIndex not 0" 0;
+            mem.firstIndex; 
           } else {
             if (thisArg.start >= (mem.firstIndex)) {
-              thisArg.start; //"thisArg.start is already the index in our sliding window" Nat.sub(thisArg.start, (archiveState.firstIndex));
+              thisArg.start;
             } else {
               Debug.trap("last index must be larger than requested start plus one");
             };
           };
 
           let end = if (history.len() == 0) {
-            // icdev: Vec.size(archiveState.ledger)==0){
-            mem.lastIndex; //icdev: 0;
+            mem.lastIndex; 
           } else if (thisArg.start + thisArg.length >= mem.lastIndex) {
-            mem.lastIndex - 1 : Nat; //"lastIndex - 1 is sufficient to point the last available position in the sliding window) Nat.sub(archiveState.history.len(),1); // ILDE Vec.size(archiveState.ledger), 1);
+            mem.lastIndex - 1 : Nat; 
           } else {
             thisArg.start + thisArg.length - 1 : Nat;
-            //icdev: Nat.sub((Nat.sub(archiveState.lastIndex,archiveState.firstIndex)), (Nat.sub(archiveState.lastIndex, (thisArg.start + thisArg.length))))
           };
 
-          // icdev: buf.getOpt(1) // -> ?"b"
-          //some of the items are on this server
           if (history.len() > 0) {
-            // icdev Vec.size(archiveState.ledger) > 0){
             label search for (thisItem in Iter.range(start, end)) {
               if (thisItem >= mem.lastIndex) {
-                //icdev archiveState.history.len()){ //ILDE Vec.size(archiveState.ledger)){
                 break search;
               };
               Vec.add(
                 transactions,
                 {
-                  id = thisItem; //icdev: archiveState.firstIndex + thisItem;
-                  block = history.getOpt(thisItem); //icdev: Vec.get(archiveState.ledger, thisItem)
+                  id = thisItem; 
+                  block = history.getOpt(thisItem);
                 },
               );
             };
@@ -592,7 +462,6 @@ module {
         };
       };
 
-      //get any relevant archives
       let archives = Map.new<Principal, (Vec.Vector<T.TransactionRange>, T.GetTransactionsFn)>();
 
       for (thisArgs in args.vals()) {
@@ -604,12 +473,10 @@ module {
               continue archive;
             };
 
-            // Calculate the start and end indices of the intersection between the requested range and the current archive.
             let overlapStart = Nat.max(seeking, thisItem.1.start);
             let overlapEnd = Nat.min(thisArgs.start + thisArgs.length - 1, thisItem.1.start + thisItem.1.length - 1);
             let overlapLength = Nat.sub(overlapEnd, overlapStart) + 1;
 
-            // Create an archive request for the overlapping range.
             switch (Map.get(archives, Map.phash, thisItem.0)) {
               case (null) {
                 let newVec = Vec.new<T.TransactionRange>();
@@ -634,12 +501,10 @@ module {
               };
             };
 
-            // If the overlap ends exactly where the requested range ends, break out of the loop.
             if (overlapEnd == Nat.sub(thisArgs.start + thisArgs.length, 1)) {
               break archive;
             };
 
-            // Update seeking to the next desired transaction.
             seeking := overlapEnd + 1;
           };
         };
@@ -647,7 +512,7 @@ module {
 
       return {
         log_length = ledger_length;
-        certificate = CertifiedData.getCertificate(); //will be null in update calls
+        certificate = CertifiedData.getCertificate(); 
         blocks = Vec.toArray(transactions);
         archived_blocks = Iter.toArray<T.ArchivedTransactionResponse>(
           Iter.map<(Vec.Vector<T.TransactionRange>, T.GetTransactionsFn), T.ArchivedTransactionResponse>(
@@ -685,7 +550,7 @@ module {
         );
       } else {
         switch (request.from) {
-          case (null) {}; //unreachable
+          case (null) {}; 
           case (?val) {
             if (canister_aux == val) {
               bFound := true;
@@ -710,7 +575,7 @@ module {
           };
         } else {
           switch (request.from) {
-            case (null) {}; //unreachable
+            case (null) {}; 
             case (?val) {
               if (thisItem.0 == val) {
                 bFound := true;

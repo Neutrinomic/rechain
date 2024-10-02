@@ -12,7 +12,6 @@ import Time "mo:base/Time";
 import Int "mo:base/Int";
 
 import T "./types";
-import TLedger "../test/ledger/types";
 import List "mo:base/List";
 import Iter "mo:base/Iter";
 
@@ -70,9 +69,6 @@ module {
         var started = false; // If this flag is off, the reader does nothing
 
         let ledger = actor (Principal.toText(ledger_id)) : T.ICRC3Interface; 
-        // let noarchive = actor (Principal.toText(noarchive_id)) : TLedger.NoArchiveInterface; //ILDE: Ideally, this interface should be passed as parameter
-        //                                                                                      //     problems is "Action" and "ActionError" belong to "test/types.mo"
-        //                                                                                      //     idea: pass E to Reader and define interface here (TBD) 
         var lastTxTime : Nat64 = 0;
         let maxTransactionsInCall:Nat = 2000;//50;//ONLY FOR DEBUG. PUT 2000 in production. Consistent with Rechain minsize of archives!!!!!!!!!!!!;
         

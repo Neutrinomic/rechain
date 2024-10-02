@@ -35,8 +35,8 @@ module {
         mem : Mem;
         ledger_id : Principal;
         start_from_block: {#id:Nat; #last};
-        onError : (Text) -> (); // If error occurs during following and processing it will return the error
-        onCycleEnd : (Nat64) -> (); // Measure performance of following and processing transactions. Returns instruction count
+        onError : (Text) -> (); 
+        onCycleEnd : (Nat64) -> (); 
         onRead : ([{block: ?T.Value; id:Nat}]) -> ();
     }) {
         var started = false;
@@ -45,7 +45,7 @@ module {
         let maxTransactionsInCall:Nat = 2000;
 
         var lock:Int = 0;
-        let MAX_TIME_LOCKED:Int = 120_000_000_000; // 120 seconds
+        let MAX_TIME_LOCKED:Int = 120_000_000_000; 
 
         let ARCHCALLS_PER_CYCLE = 40;
 
@@ -56,7 +56,7 @@ module {
             if (now - lock < MAX_TIME_LOCKED) return;
             lock := now;
             onError("cycle started");
-            let inst_start = Prim.performanceCounter(1); // 1 is preserving with async
+            let inst_start = Prim.performanceCounter(1); 
 
             if (mem.last_indexed_tx == 0) {
                 switch(start_from_block) {
@@ -88,14 +88,12 @@ module {
             if (query_start != mem.last_indexed_tx) {lock:=0; return;};
 
             if (rez.archived_blocks.size() == 0) {
-                // We can just process the transactions that are inside the ledger and not inside archive
                 onRead(rez.blocks);
                 mem.last_indexed_tx += rez.blocks.size();
          
             
             } else {
-                // We need to collect transactions from archive and get them in order
-                let unordered = Vector.new<TransactionUnordered>(); // Probably a better idea would be to use a large enough var array
+                let unordered = Vector.new<TransactionUnordered>(); 
                 onError("working on archived blocks");
 
                 for (atx in rez.archived_blocks.vals()) {
@@ -108,13 +106,11 @@ module {
                     var buf = List.nil<async T.GetTransactionsResult>();
                     var data = List.nil<T.GetTransactionsResult>();
                     for (arg in args.vals()) {
-                        // The calls are sent here without awaiting anything
                         let promise = atx.callback([arg]);
                         buf := List.push(promise, buf); 
                     };
 
                     for (promise in List.toIter(buf)) {
-                        // Await results of all promises. We recieve them in sequential order
                         data := List.push(await promise, data);
                     };
                     let chunks = List.toArray(data);
@@ -122,7 +118,6 @@ module {
                     var chunk_idx = 0;
                     for (chunk in chunks.vals()) {
                         if (chunk.blocks.size() > 0) {
-                            // If chunks (except the last one) are smaller than 2000 tx then implementation is strange
                             if ((chunk_idx < (args.size() - 1:Nat)) and (chunk.blocks.size() != maxTransactionsInCall)) {
 
                                 onError("chunk.transactions.size() != " # Nat.toText(maxTransactionsInCall) # " | chunk.transactions.size(): " # Nat.toText(chunk.blocks.size()));
@@ -160,14 +155,11 @@ module {
                 };
             };
 
-            let inst_end = Prim.performanceCounter(1); // 1 is preserving with async
+            let inst_end = Prim.performanceCounter(1); 
             onCycleEnd(inst_end - inst_start);
 
             lock := 0;
         };
-
-  
-
 
         public func start<system>() {
             if (started) Debug.trap("already started");

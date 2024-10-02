@@ -12,15 +12,6 @@ import {
 } from "./build/reader_noarchive.idl.js";
 
 import {
-  // Action,
-  // Account,
-  // GetBlocksArgs,
-  // TransactionRange,
-  // GetTransactionsResult,
-  // Value__1,
-} from "./build/reader_noarchive.idl.js";
-
-import {
   _SERVICE as TestService_ledger,
   idlFactory as TestIdlFactory_ledger,
   init as init_ledger,
@@ -29,8 +20,6 @@ import {
 import {
   Action,
   Account,
-  GetBlocksArgs,
-  TransactionRange,
   GetTransactionsResult,
   Value__1,
 } from "./build/reader_ledger.idl.js";
@@ -41,22 +30,12 @@ import {
   init as init_reader,
 } from "./build/reader_reader.idl.js";
 
-import {
-  // Action,
-  // Account,
-  // GetBlocksArgs,
-  // TransactionRange,
-  // GetTransactionsResult,
-  // Value__1,
-} from "./build/reader_reader.idl.js";
 //@ts-ignore
 import { toState } from "@infu/icblast";
-// Jest can't handle multi threaded BigInts o.O That's why we use toState
 
 const READER_READER_WASM_PATH = resolve(__dirname, "./build/reader_reader.wasm");
 const READER_LEDGER_WASM_PATH = resolve(__dirname, "./build/reader_ledger.wasm");
 const READER_NOARCHIVE_WASM_PATH = resolve(__dirname, "./build/reader_noarchive.wasm");
-
 
 export async function TestLedger(pic: PocketIc, ledgerCanisterId: Principal) {
   const fixture = await pic.setupCanister<TestService_ledger>({
@@ -78,29 +57,27 @@ export async function TestNoarchive(pic: PocketIc, noarchiveCanisterId: Principa
   return fixture;
 }
 
-export async function TestReader(pic: PocketIc, readerCanisterId: Principal, ledger_pid: Principal) {//, noarchive_pid: Principal) {
+export async function TestReader(pic: PocketIc, readerCanisterId: Principal, ledger_pid: Principal) {
   const fixture = await pic.setupCanister<TestService_reader>({
     idlFactory: TestIdlFactory_reader,
     wasm: READER_READER_WASM_PATH,
-    arg: IDL.encode(init_reader({ IDL }), [ledger_pid]), // noarchive_pid]), 
+    arg: IDL.encode(init_reader({ IDL }), [ledger_pid]), 
   });
 
   return fixture;
 }
 
-
 function decodeBlock2(my_blocks:GetTransactionsResult, block_pos:number ) {
-  // console.log(my_blocks.blocks[0]);
   let my_phash;
   let my_auxm1;
   let my_block_id = -1n;
   let my_block_ts = -1n;
   let my_created_at_time = -1n;
-  let my_memo;//: Uint8Array | number[];
-  let my_caller;//: Uint8Array | number[];
+  let my_memo;
+  let my_caller;
   let my_fee = -1n;
   let my_btype = '???';
-  let my_payload_amt = -1n;//', { Map: [Array] } ]
+  let my_payload_amt = -1n;
   let my_payload_to;
   let my_payload_from;
 
@@ -117,7 +94,6 @@ function decodeBlock2(my_blocks:GetTransactionsResult, block_pos:number ) {
     if ('Map' in aux) {
       const aux2 = aux.Map;
       for (let i = 0; i < aux2.length; i++) {
-        // phash, ts, btype, tx (created_at_time, memo, caller, fee, payload (amt, from, to))
         switch(aux2[i][0]) {
           case 'phash':
             const aux_phash = aux2[i][1];
@@ -142,7 +118,6 @@ function decodeBlock2(my_blocks:GetTransactionsResult, block_pos:number ) {
             if ('Map' in aux_tx_aux) {
               const aux_tx = aux_tx_aux.Map;
               for (let j = 0; j < aux_tx.length; j++) {
-                //(created_at_time, memo, caller, fee, payload (amt, from, to)
                 switch(aux_tx[j][0]) {
                   case 'created_at_time':
                     const cat_aux = aux_tx[j][1]
@@ -169,7 +144,6 @@ function decodeBlock2(my_blocks:GetTransactionsResult, block_pos:number ) {
                     }
                     break;
                   case 'payload':
-                    // amt, from, to
                     const pay_aux = aux_tx[j][1]
                     if ('Map' in pay_aux) {
                       const pay_aux_map = pay_aux.Map;
@@ -217,13 +191,13 @@ function decodeBlock2(my_blocks:GetTransactionsResult, block_pos:number ) {
     block_id: my_block_id,
     block_ts: my_block_ts,
     created_at_time: my_created_at_time,
-    memo: my_memo,//: Uint8Array | number[];
-    caller: my_caller,//: Uint8Array | number[];
+    memo: my_memo,
+    caller: my_caller,
     fee: my_fee,
     btype: my_btype,
-    payload_amt: my_payload_amt,//', { Map: [Array] } ]
-    payload_to: my_payload_to,//: Uint8Array | number[];
-    payload_from: my_payload_from});//: Uint8Array | number[];
+    payload_amt: my_payload_amt,
+    payload_to: my_payload_to,
+    payload_from: my_payload_from});
 };
 
 describe("reader", () => {
@@ -253,19 +227,12 @@ describe("reader", () => {
   beforeAll(async () => {
     pic = await PocketIc.create(process.env.PIC_URL); 
 
-    //Create ledger
     const fixture_ledger = await TestLedger(pic, Principal.fromText("aaaaa-aa"));
     can_ledger = fixture_ledger.actor;
     canCanisterId_ledger = fixture_ledger.canisterId; 
     
     await can_ledger.set_ledger_canister();
 
-    //Create noarchive
-    // const fixture_noarchive = await TestNoarchive(pic, Principal.fromText("aaaaa-aa"));
-    // can_noarchive = fixture_noarchive.actor;
-    // canCanisterId_noarchive = fixture_noarchive.canisterId; 
-
-    //Create reader
     const fixture_reader = await TestReader(pic, Principal.fromText("aaaaa-aa"), canCanisterId_ledger); // canCanisterId_noarchive);
     can_reader = fixture_reader.actor;
     canCanisterId_ledger = fixture_reader.canisterId; 
@@ -273,16 +240,16 @@ describe("reader", () => {
   });
 
   afterAll(async () => {
-    await pic.tearDown(); //this means "it removes the replica"
+    await pic.tearDown();
   });
 
   it("check_balance_in_reader_after_mints", async () => {
     let my_mint_action: Action = {
       ts : 0n,
-      created_at_time : [0n], //?Nat64
-      memo: [], //?Blob;
+      created_at_time : [0n],
+      memo: [], 
       caller: jo.getPrincipal(),  
-      fee: [], //?Nat
+      fee: [], 
       payload : {
           mint : {
               amt : 50n,
@@ -319,10 +286,10 @@ describe("reader", () => {
   it("check_balance_in_reader_after_burns", async () => {
     let my_burn_action: Action = {
       ts : 0n,
-      created_at_time : [0n], //?Nat64
-      memo: [], //?Blob;
+      created_at_time : [0n],
+      memo: [], 
       caller: jo.getPrincipal(),  
-      fee: [], //?Nat
+      fee: [], 
       payload : {
           burn : {
               amt : 50n,
@@ -356,10 +323,10 @@ describe("reader", () => {
   it("check_balance_in_reader_after_transfers", async () => {
     let my_transfer_action: Action = {
       ts : 0n,
-      created_at_time : [0n], //?Nat64
-      memo: [], //?Blob;
+      created_at_time : [0n], 
+      memo: [], 
       caller: jo.getPrincipal(),  
-      fee: [], //?Nat
+      fee: [],
       payload : {
           transfer : {
               amt : 50n,
@@ -398,4 +365,3 @@ describe("reader", () => {
   }
   
 });
-
