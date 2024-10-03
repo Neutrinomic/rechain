@@ -1,15 +1,6 @@
 import Array "mo:base/Array";
-// import Blob "mo:base/Blob";
-// import Debug "mo:base/Debug";
 import Nat "mo:base/Nat";
-// import Error "mo:base/Error";
 import T "./types";
-// import Text "mo:base/Text";
-// import Timer "mo:base/Timer";
-// import Iter "mo:base/Iter";
-// import Option "mo:base/Option";
-// import Utils "./utils";
-// import Nat8 "mo:base/Nat8";
 
 module {
 

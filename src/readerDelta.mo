@@ -10,7 +10,6 @@ import Nat64 "mo:base/Nat64";
 import Time "mo:base/Time";
 import Int "mo:base/Int";
 import List "mo:base/List";
-import Iter "mo:base/Iter";
 import T "./types";
 
 module {

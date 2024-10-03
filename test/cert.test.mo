@@ -143,11 +143,11 @@ actor Self {
     };
 
     public query func icrc3_get_blocks(args: rechain.GetBlocksArgs) : async rechain.GetBlocksResult{
-        return chain.get_blocks(args);
+        return chain.icrc3_get_blocks(args);
     };
 
     public query func icrc3_get_archives(args: rechain.GetArchivesArgs) : async rechain.GetArchivesResult{
-        return chain.get_archives(args);
+        return chain.icrc3_get_archives(args);
     };
 
     var chain = rechain.Chain<T.Action, T.ActionError>({ 
@@ -281,7 +281,7 @@ actor Self {
     };
 
     public query func icrc3_get_tip_certificate() : async ?Trechain.DataCertificate {
-        return chain.get_tip_certificate();
+        return chain.icrc3_get_tip_certificate();
     };
 
 };

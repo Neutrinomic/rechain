@@ -23,6 +23,18 @@ import SysLog "./syslog";
 
 module {
 
+  /// Type structure used to initialize a `Chain` object.
+  ///
+  /// #### Fields
+  /// - `history` - stable structure to store the ledger.
+  /// - `phash` - hash value of the last block pushed into the ledger.
+  /// - `lastIndex` - index of the next block to be stored in the ledger (consecutive).
+  /// - `firstIndex` - index of the first block available in the ledger (blocks previous to firstIndex block are archived).
+  /// - `canister` - principal of the canister that owns this ledger.
+  /// - `archives` - map storing refferences to all archive canisters.
+  /// - `cert_store` - object storing all certificates generated so far (one certificate per stored block).
+  /// - `eventlog_mem` - logging structure to store execution logs for post-mortem analysis.
+  ///
   public type Mem = {
     history : SWB.StableData<T.Value>;
     var phash : ?Blob;
@@ -31,18 +43,15 @@ module {
     var canister : ?Principal;
     archives : Map.Map<Principal, T.TransactionRange>;
     cert_store : CertTree.Store;
-    
     eventlog_mem : SWB.StableData<Text>;
   };
 
-  public func memEventLog() : {_eventlog_mem: SWB.SlidingWindowBuffer<Text>} {
-    {_eventlog_mem = SWB.SlidingWindowBuffer<Text>(SWB.SlidingWindowBufferNewMem<Text>())};
-
-  };
-  public func memEventLog2() : {_eventlog_mem: SWB.StableData<Text>} {
-    {_eventlog_mem = SWB.SlidingWindowBufferNewMem<Text>()};
-
-  };
+  /// Function to create all memory structures required by the ledger
+  ///
+  /// #### Usage example
+  /// ```motoko
+  ///     stable let chain_mem = rechain.Mem();
+  /// ```
   public func Mem() : Mem {
     {
       history = SWB.SlidingWindowBufferNewMem<T.Value>();
@@ -52,7 +61,6 @@ module {
       var canister = null;
       archives = Map.new<Principal, T.TransactionRange>();
       cert_store = CertTree.newStore(); 
-
       eventlog_mem = SWB.SlidingWindowBufferNewMem<Text>();
     };
   };
@@ -88,13 +96,37 @@ module {
     secsCycleMaintenance = 2160; //6*60*60; // every 6 hours we check archive canisters have enough cycles
     archiveControllers = [];
     supportedBlocks = [];
-  } : T.InitArgs;
+  } : T.ChainSettings;
 
+
+  /// Class `Chain`.
+  ///
+  /// #### Fields
+  /// - `mem` - stable structure to store the ledger.
+  /// - `encodeBlock` - hash value of the last block pushed into the ledger.
+  /// - `reducers` - index of the next block to be stored in the ledger (consecutive).
+  /// - `settings` - index of the first block available in the ledger (blocks previous to firstIndex block are archived).
+  ///
+  /// #### Initilization example
+  /// ```motoko
+  ///     stable let chain_mem = rechain.Mem();     // <----
+  ///     var chain = rechain.Chain<T.Action, T.ActionError>({ 
+  ///                     settings = ?{rechain.DEFAULT_SETTINGS with 
+  ///                                  supportedBlocks = []; 
+  ///                                  maxActiveRecords = 100; 
+  ///                                  settleToRecords = 30; 
+  ///                                  maxRecordsInArchiveInstance = 120;
+  ///                                 };
+  ///                     mem = chain_mem;         // <----
+  ///                     encodeBlock = encodeBlock;
+  ///                     reducers = [balances.reducer]; 
+  ///                });
+  /// ```
   public class Chain<A, E>({
     mem : Mem;
     encodeBlock : (A) -> ?[T.ValueMap];
     reducers : [ActionReducer<A, E>];
-    settings : ?T.InitArgs;
+    settings : ?T.ChainSettings;
   }) {
 
     var started = false;
@@ -107,8 +139,6 @@ module {
       settings = Option.get(settings, DEFAULT_SETTINGS);
    
     };
-
-
 
     public func dispatch(action : A) : ({ #Ok : BlockId; #Err : E }) {
       let reducerResponse = Array.map<ActionReducer<A, E>, ReducerResponse<E>>(reducers, func(fn) = fn(action));
@@ -142,8 +172,6 @@ module {
 
       #Ok(blockId);
     };
-
-
 
     public func upgrade_archives() : async () {
 
@@ -379,29 +407,6 @@ module {
       };
     };
 
-    public func check_archives_balance() : async () {
-
-      let syslog = SysLog.SysLog({_eventlog_mem=mem.eventlog_mem});
-      
-      let archives = Iter.toArray(Map.entries<Principal, T.TransactionRange>(mem.archives));
-      for (i in archives.keys()) {
-        let (a,_) = archives[i];
-
-        let archiveActor = actor (Principal.toText(a)) : T.ArchiveInterface;
-        let archive_cycles : Nat = await archiveActor.cycles(); 
-        if (archive_cycles < archiveState.settings.minArchiveCycles) {
-          if (ExperimentalCycles.balance() > archiveState.settings.archiveCycles * 2) { 
-            ExperimentalCycles.add<system>(archiveState.settings.archiveCycles);
-            await archiveActor.deposit_cycles();
-          } else { 
-            syslog.add("Err : Not enough cycles to replenish archive canisters " # debug_show (ExperimentalCycles.balance()));
-            return;
-          };
-        };
-      };
-      return;
-    };
-
     public func stats() : T.Stats {
       return {
         localLedgerSize = history.len(); 
@@ -414,7 +419,7 @@ module {
       };
     };
 
-    public func get_blocks(args : T.GetBlocksArgs) : T.GetBlocksResult {
+    public func icrc3_get_blocks(args : T.GetBlocksArgs) : T.GetBlocksResult {
       let local_ledger_length = history.len();
       let ledger_length = if (mem.lastIndex == 0 and local_ledger_length == 0) {
         0;
@@ -528,8 +533,7 @@ module {
       };
     };
 
-
-    public func get_archives(request : T.GetArchivesArgs) : T.GetArchivesResult {
+    public func icrc3_get_archives(request : T.GetArchivesArgs) : T.GetArchivesResult {
 
       let ?canister_aux = mem.canister else Debug.trap("Archive controller canister must be set before call get_archives");
        
@@ -589,7 +593,7 @@ module {
     };
 
 
-    public func get_tip_certificate() : ?T.DataCertificate {
+    public func icrc3_get_tip_certificate() : ?T.DataCertificate {
 
       let ct = CertTree.Ops(mem.cert_store);
       let blockWitness = ct.reveal([Text.encodeUtf8("last_block_index")]);

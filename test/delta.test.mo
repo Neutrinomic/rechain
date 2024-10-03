@@ -69,11 +69,11 @@ actor class Delta({archive_controllers: [Principal]}) = this {
     });
     
     public query func icrc3_get_blocks(args: rechain.GetBlocksArgs): async rechain.GetBlocksResult {
-        return chain.get_blocks(args);
+        return chain.icrc3_get_blocks(args);
     };
 
     public query func icrc3_get_archives(args: rechain.GetArchivesArgs): async rechain.GetArchivesResult {
-        return chain.get_archives(args);
+        return chain.icrc3_get_archives(args);
     };
 
     public query func icrc3_supported_block_types(): async [rechain.BlockType] {

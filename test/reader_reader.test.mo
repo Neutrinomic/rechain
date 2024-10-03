@@ -212,15 +212,13 @@ actor class reader_reader(ledger_pid : Principal) = Self {
 
     stable let reader_mem = reader.Mem();
 
-
     var my_reader = reader.Reader<T.Action>({
         mem = reader_mem;
         ledger_id = ledger_pid;
         start_from_block = #id(0);
         onError = onError; 
         onCycleEnd = onCycleEnd; 
-        onRead = myOnRead;
-        onReadNew = myOnReadNew;
+        onRead = myOnReadNew;
         decodeBlock = decodeBlock;      
         getTimeFromAction = getTimeFromAction;
         maxParallelRequest = 40;

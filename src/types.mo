@@ -42,7 +42,7 @@ module {
         url : Text;
     };
 
-    public type InitArgs = {
+    public type ChainSettings = {
       maxActiveRecords : Nat;
       settleToRecords : Nat;
       maxRecordsInArchiveInstance : Nat;
@@ -78,7 +78,7 @@ module {
         archives: [(Principal, TransactionRange)];
         ledgerCanister : ?Principal;
         bCleaning : Bool;
-        archiveProperties: InitArgs;
+        archiveProperties: ChainSettings;
     };
     
     public type GetBlocksArgs = [TransactionRange];
