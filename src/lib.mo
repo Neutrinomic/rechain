@@ -46,7 +46,7 @@ module {
     eventlog_mem : SWB.StableData<Text>;
   };
 
-  /// Function to create all memory structures required by the ledger
+  /// Function to create all memory structures `Mem` required to initialize the ledger object
   ///
   /// #### Usage example
   /// ```motoko
@@ -65,8 +65,11 @@ module {
     };
   };
 
+  /// ICRC3 block type defintion 
+  ///
   public type Value = T.Value;
   public type ValueMap = T.ValueMap;
+
   public type GetBlocksArgs = T.GetBlocksArgs;
   public type GetBlocksResult = T.GetBlocksResult;
   public type GetArchivesArgs = T.GetArchivesArgs;
@@ -84,16 +87,30 @@ module {
   public type AddTransactionsResponse = T.AddTransactionsResponse;
   public type BlockType = T.BlockType;
   
+  /// Default settings to initialize a `Chain` object. 
+  ///
+  /// #### Fields
+  /// - `maxActiveRecords` - maximum size of ledger before archiving (2000).
+  /// - `settleToRecords` - ledger size after archiving (1000).
+  /// - `maxRecordsInArchiveInstance` - maximum sixe of archive canister. If archive is full, we create a new one (10_000_000).
+  /// - `maxArchivePages` - every page is 65536 per KiB. 62500 pages is default size (4 Gbytes).
+  /// - `archiveIndexType` - archive canister memory are always of `#stable` type.
+  /// - `maxRecordsToArchive` - maximum number of blocks archived every archiving cycle (10_000)
+  /// - `archiveCycles` - cycle requirement to create an archive canister (2T: 2_000_000_000).
+  /// - `minArchiveCycles` - if archive canister is below this balance (and main ledger canister balance is > 2*archiveCycles) we add "archiveCycles" (500_000_000_000).
+  /// - `secsCycleMaintenance` - every time period we check whether archive canisters have enough cycles (6 hours: 21600);
+  /// - `archiveControllers` - additional archive canisters controllers if any (default is empty).
+  /// - `supportedBlocks` - not yet implemented (default is empty).
   public let DEFAULT_SETTINGS = {
-    maxActiveRecords = 2000; // max size of ledger before archiving 
-    settleToRecords = 1000; //It makes sure to leave 1000 records in the ledger after archiving
-    maxRecordsInArchiveInstance = 10_000_000; //if archive full, we create a new one
-    maxArchivePages = 62500; //Archive constructor parameter: every page is 65536 per KiB. 62500 pages is default size (4 Gbytes)
+    maxActiveRecords = 2000; 
+    settleToRecords = 1000; 
+    maxRecordsInArchiveInstance = 10_000_000; 
+    maxArchivePages = 62500; 
     archiveIndexType = #Stable;
-    maxRecordsToArchive = 10_000; // maximum number of blocks archived every archiving cycle. if bigger, a new time is started and the archiving function is called again
-    archiveCycles = 2_000_000_000_000; //two trillion: cycle requirement to create an archive canister
-    minArchiveCycles = 500_000_000_000; // if archive canister is below this balance (and main ledger canister balance is > 2*archiveCycles) we add "archiveCycles"
-    secsCycleMaintenance = 2160; //6*60*60; // every 6 hours we check archive canisters have enough cycles
+    maxRecordsToArchive = 10_000; 
+    archiveCycles = 2_000_000_000_000; 
+    minArchiveCycles = 500_000_000_000; 
+    secsCycleMaintenance = 21600; 
     archiveControllers = [];
     supportedBlocks = [];
   } : T.ChainSettings;
@@ -102,22 +119,28 @@ module {
   /// Class `Chain`.
   ///
   /// #### Fields
-  /// - `mem` - stable structure to store the ledger.
-  /// - `encodeBlock` - hash value of the last block pushed into the ledger.
-  /// - `reducers` - index of the next block to be stored in the ledger (consecutive).
-  /// - `settings` - index of the first block available in the ledger (blocks previous to firstIndex block are archived).
+  /// - `mem` - stable structure of type `Mem`.
+  /// - `encodeBlock` - custom function to encode user application specific events into ICRC3 `Value` type object.
+  /// - `reducers` - list of reducer functions meant to update the canister state with every canister event.
+  /// - `settings` - initialization arguments.
   ///
   /// #### Initilization example
   /// ```motoko
-  ///     stable let chain_mem = rechain.Mem();     // <----
+  ///     func encodeBlock(b: UserAction) : ?[ValueMap] {...}
+  ///     stable let balances_mem = Balances.Mem();
+  ///     let balances = Balances.Balances({
+  ///         config;
+  ///         mem = balances_mem;
+  ///     });
+  ///     stable let chain_mem = rechain.Mem();     
   ///     var chain = rechain.Chain<T.Action, T.ActionError>({ 
   ///                     settings = ?{rechain.DEFAULT_SETTINGS with 
   ///                                  supportedBlocks = []; 
-  ///                                  maxActiveRecords = 100; 
+  ///                                  maxActiveRecords = 100; // testing purposes
   ///                                  settleToRecords = 30; 
   ///                                  maxRecordsInArchiveInstance = 120;
   ///                                 };
-  ///                     mem = chain_mem;         // <----
+  ///                     mem = chain_mem;         
   ///                     encodeBlock = encodeBlock;
   ///                     reducers = [balances.reducer]; 
   ///                });
@@ -140,6 +163,17 @@ module {
    
     };
 
+    /// Main method of `Chain` object. It Sends the canister action to the the reducers to update the canister state,
+    /// it calls the `encodeBlock` method, and finally pushes the encoded block into the ledger
+    ///
+    /// #### Usage example
+    /// ```motoko
+    ///     // User canister update method
+    ///     public shared(msg) func add_record(x: Action): async (DispatchResult) {
+    ///        let ret = chain.dispatch(x); 
+    ///        return ret;
+    ///     };
+    /// ```
     public func dispatch(action : A) : ({ #Ok : BlockId; #Err : E }) {
       let reducerResponse = Array.map<ActionReducer<A, E>, ReducerResponse<E>>(reducers, func(fn) = fn(action));
       let hasError = Array.find<ReducerResponse<E>>(reducerResponse, func(resp) = switch (resp) { case (#Err(_)) true; case (_) false });
@@ -362,6 +396,15 @@ module {
       return;
     };
 
+    /// this method is used to start the recurrent timers in charge of 1) archive creation, 2) cycle replenishment.
+    ///
+    /// #### Usage example
+    /// ```motoko
+    ///     // The following code is called in the main body of the user canister
+    ///     ignore Timer.setTimer<system>(#seconds 0, func () : async () {
+    ///           await chain.start_timers<system>();
+    ///     });
+    /// ```
     public func start_timers<system>() : async () {
       if (started) Debug.trap("already started");
       started := true;
@@ -418,7 +461,11 @@ module {
         archiveProperties = archiveState.settings;
       };
     };
-
+    
+    /// implements the ICRC3 standard query call to retrieve blocks.
+    ///
+    /// #### Standard refference
+    /// https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#icrc3_get_blocks
     public func icrc3_get_blocks(args : T.GetBlocksArgs) : T.GetBlocksResult {
       let local_ledger_length = history.len();
       let ledger_length = if (mem.lastIndex == 0 and local_ledger_length == 0) {
@@ -533,6 +580,8 @@ module {
       };
     };
 
+    /// implements the ICRC3 standard query call to retrieve archive canister information holding different ranges of blocks specified in `request`.
+    /// this method is not part of the ICRC3 standard.
     public func icrc3_get_archives(request : T.GetArchivesArgs) : T.GetArchivesResult {
 
       let ?canister_aux = mem.canister else Debug.trap("Archive controller canister must be set before call get_archives");
@@ -592,7 +641,10 @@ module {
       return Vec.toArray(results);
     };
 
-
+    /// implements the ICRC3 standard query call to retrieve the certificate of the last block added to the ledger.
+    ///
+    /// #### Standard refference
+    /// https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#icrc3_get_tip_certificate
     public func icrc3_get_tip_certificate() : ?T.DataCertificate {
 
       let ct = CertTree.Ops(mem.cert_store);
