@@ -69,7 +69,7 @@ module {
   ///
   public type Value = T.Value;
   public type ValueMap = T.ValueMap;
-
+  public type DataCertificate = T.DataCertificate;
   public type GetBlocksArgs = T.GetBlocksArgs;
   public type GetBlocksResult = T.GetBlocksResult;
   public type GetArchivesArgs = T.GetArchivesArgs;

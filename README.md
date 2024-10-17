@@ -19,6 +19,96 @@ This Motoko library serves as a middleware framework enabling the integration of
     - In the ICDev/PanIndustrial implementation, if ledger exceeded its max length, it was setting a timer to run in the next round to run the archive. We instead run a recurrent timer that checks every 30 seconds whether we need to create an archive.
     - Recurrent timer (every 6 hours) that checks all archive canister cycle balances and refills them with X amount of cycles if they dropped bellow Y unless the main canister is bellow Z (X,Y,Z are settings)
 
+**Usage:**
+```
+  import rechain "mo:rechain";
+
+  public type Action = {
+        ts: Nat64;
+        created_at_time: Nat64;
+        memo: Blob;
+        caller: Principal;
+        fee: Nat;
+        payload : {
+            #swap: {
+                amt: Nat;
+            };
+            #add: {
+                amt : Nat;
+            };
+        };
+    };
+
+    public type ActionError = {ok:Nat; err:Text};
+
+    stable let chain_mem  = rechain.Mem();
+
+    func encodeBlock(b: Action): ?[rechain.ValueMap] {
+        ?[
+            ("ts", #Nat(Nat64.toNat(b.ts))),
+            ("btype", #Text(switch (b.payload) {
+                    case (#swap(_)) "1swap";
+                    case (#add(_)) "1add";
+                })),
+            ("tx", #Map([
+                ("created_at_time", #Nat(Nat64.toNat(b.created_at_time))),
+                ("memo", #Blob(b.memo)),
+                ("caller", #Blob(Principal.toBlob(b.caller))),
+                ("fee", #Nat(b.fee)),
+                ("payload", #Map(switch (b.payload) {
+                    case (#swap(data)) {
+                        [
+                            ("amt", #Nat(data.amt))
+                        ]
+                    };
+                    case (#add(data)) {
+                        [
+                            ("amt", #Nat(data.amt))
+                        ]
+                    };
+                }))
+            ]))
+        ];
+    };
+
+    var chain = rechain.Chain<Action, ActionError>({
+        settings = ?{rechain.DEFAULT_SETTINGS with supportedBlocks = [];};
+        mem = chain_mem;
+        encodeBlock = encodeBlock;
+        reducers = [];
+    });
+    
+    ignore Timer.setTimer<system>(#seconds 0, func () : async () {
+        await chain.start_timers<system>();
+    });
+    
+    ignore Timer.setTimer<system>(#seconds 1, func () : async () {
+        await chain.upgrade_archives();
+    });
+
+    public query func icrc3_get_blocks(args: rechain.GetBlocksArgs): async rechain.GetBlocksResult {
+        return chain.icrc3_get_blocks(args);
+    };
+
+    public query func icrc3_get_archives(args: rechain.GetArchivesArgs): async rechain.GetArchivesResult {
+        return chain.icrc3_get_archives(args);
+    };
+
+    public query func icrc3_supported_block_types(): async [rechain.BlockType] {
+        return chain.icrc3_supported_block_types();
+    };
+
+    public func set_ledger_canister(): async () {
+        chain_mem.canister := ?Principal.fromActor(this);
+    };
+
+    public query func icrc3_get_tip_certificate() : async ?Trechain.DataCertificate {
+        return chain.icrc3_get_tip_certificate();
+    };
+  
+
+```
+
 **Examples:**
 
 - **Use case 1:** How to add ledger functionalities to your dapps/canisters
