@@ -72,19 +72,25 @@ This Motoko library serves as a middleware framework enabling the integration of
     };
 
     var chain = rechain.Chain<Action, ActionError>({
-        settings = ?{rechain.DEFAULT_SETTINGS with supportedBlocks = [];};
+        settings = ?{rechain.DEFAULT_SETTINGS with supportedBlocks = [{block_type = "55vec"; url = "https://github.com/dfinity/ICRC/issues/55"}];};
         mem = chain_mem;
         encodeBlock = encodeBlock;
         reducers = [];
     });
     
+    //The need for these 3 functions will go away soon
     ignore Timer.setTimer<system>(#seconds 0, func () : async () {
         await chain.start_timers<system>();
     });
-    
+
     ignore Timer.setTimer<system>(#seconds 1, func () : async () {
         await chain.upgrade_archives();
     });
+
+    public func set_ledger_canister(): async () {
+        chain_mem.canister := ?Principal.fromActor(this);
+    };
+    //---
 
     public query func icrc3_get_blocks(args: rechain.GetBlocksArgs): async rechain.GetBlocksResult {
         return chain.icrc3_get_blocks(args);
@@ -98,9 +104,7 @@ This Motoko library serves as a middleware framework enabling the integration of
         return chain.icrc3_supported_block_types();
     };
 
-    public func set_ledger_canister(): async () {
-        chain_mem.canister := ?Principal.fromActor(this);
-    };
+  
 
     public query func icrc3_get_tip_certificate() : async ?Trechain.DataCertificate {
         return chain.icrc3_get_tip_certificate();
