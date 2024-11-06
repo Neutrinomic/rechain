@@ -12,7 +12,7 @@ import Vec "mo:vector";
 import RepIndy "mo:rep-indy-hash";
 import Text "mo:base/Text";
 import Timer "mo:base/Timer";
-import Archive "./archive";
+import Archive "./internal/archive";
 import ExperimentalCycles "mo:base/ExperimentalCycles";
 import Iter "mo:base/Iter";
 import CertTree "mo:ic-certification/CertTree";
@@ -20,50 +20,17 @@ import MTree "mo:ic-certification/MerkleTree";
 import Option "mo:base/Option";
 import Utils "./utils";
 import SysLog "./syslog";
+import Ver1 "./memory/rechain/v1";
+import MU "mo:mosup";
 
 module {
 
-  /// Type structure used to initialize a `Chain` object.
-  ///
-  /// #### Fields
-  /// - `history` - stable structure to store the ledger.
-  /// - `phash` - hash value of the last block pushed into the ledger.
-  /// - `lastIndex` - index of the next block to be stored in the ledger (consecutive).
-  /// - `firstIndex` - index of the first block available in the ledger (blocks previous to firstIndex block are archived).
-  /// - `canister` - principal of the canister that owns this ledger.
-  /// - `archives` - map storing refferences to all archive canisters.
-  /// - `cert_store` - object storing all certificates generated so far (one certificate per stored block).
-  /// - `eventlog_mem` - logging structure to store execution logs for post-mortem analysis.
-  ///
-  public type Mem = {
-    history : SWB.StableData<T.Value>;
-    var phash : ?Blob;
-    var lastIndex : Nat;
-    var firstIndex : Nat;
-    var canister : ?Principal;
-    archives : Map.Map<Principal, T.TransactionRange>;
-    cert_store : CertTree.Store;
-    eventlog_mem : SWB.StableData<Text>;
+  public module Mem {
+    public module Rechain {
+      public let V1 = Ver1.Rechain;
+    }
   };
-
-  /// Function to create all memory structures `Mem` required to initialize the ledger object
-  ///
-  /// #### Usage example
-  /// ```motoko
-  ///     stable let chain_mem = rechain.Mem();
-  /// ```
-  public func Mem() : Mem {
-    {
-      history = SWB.SlidingWindowBufferNewMem<T.Value>();
-      var phash = null;
-      var lastIndex = 0;
-      var firstIndex = 0;
-      var canister = null;
-      archives = Map.new<Principal, T.TransactionRange>();
-      cert_store = CertTree.newStore(); 
-      eventlog_mem = SWB.SlidingWindowBufferNewMem<Text>();
-    };
-  };
+  let VM = Mem.Rechain.V1;
 
   /// ICRC3 block type defintion 
   ///
@@ -145,14 +112,15 @@ module {
   ///                     reducers = [balances.reducer]; 
   ///                });
   /// ```
-  public class Chain<A, E>({
-    mem : Mem;
+  public class Chain<system, A, E>({
+    xmem : MU.MemShell<VM.Mem>;
     encodeBlock : (A) -> ?[T.ValueMap];
     reducers : [ActionReducer<A, E>];
     settings : ?T.ChainSettings;
+    me_can : Principal;
   }) {
+    let mem = MU.access(xmem);
 
-    var started = false;
 
     let history = SWB.SlidingWindowBuffer<T.Value>(mem.history);
 
@@ -217,8 +185,6 @@ module {
     };
 
     private func new_archive<system>(initArg : T.ArchiveInitArgs) : async ?(actor {}) {
-      
-      let ?this_canister = mem.canister else Debug.trap("No canister set");
 
       if (ExperimentalCycles.balance() > archiveState.settings.archiveCycles * 2) {
         ExperimentalCycles.add<system>(archiveState.settings.archiveCycles);
@@ -231,7 +197,7 @@ module {
       let ArchiveMgr = (system Archive.archive)(
         #new {
           settings = ?{
-            controllers = ?Array.append([this_canister], archiveState.settings.archiveControllers);
+            controllers = ?Array.append([me_can], archiveState.settings.archiveControllers);
             compute_allocation = null;
             memory_allocation = null;
             freezing_threshold = null;
@@ -260,7 +226,6 @@ module {
 
 
     private func check_clean_up<system>() : async () {
-      if (not started) return;
 
       archiveState.cleaningTimer := null;
 
@@ -271,8 +236,6 @@ module {
         return;
       };
       
-      let archives = Iter.toArray(Map.entries<Principal, T.TransactionRange>(mem.archives));
-
       archiveState.bCleaning := true;
 
       let (archive_detail, available_capacity) = if (Map.size(mem.archives) == 0) {
@@ -405,20 +368,10 @@ module {
     ///           await chain.start_timers<system>();
     ///     });
     /// ```
-    public func start_timers<system>() : async () {
-      if (started) Debug.trap("already started");
-      started := true;
-      
-      ignore Timer.recurringTimer<system>(#seconds 30, check_clean_up);
-      ignore Timer.recurringTimer<system>(#seconds(archiveState.settings.secsCycleMaintenance), archiveCycleMaintenance);
-    };
 
-    public func stop_timers() {
-      started := false;
-    };
+
 
     private func archiveCycleMaintenance<system>() : async () {
-      if (not started) return;
       
       let syslog = SysLog.SysLog({_eventlog_mem=mem.eventlog_mem});
       let archives = Iter.toArray(Map.entries<Principal, T.TransactionRange>(mem.archives));
@@ -456,7 +409,6 @@ module {
         lastIndex = mem.lastIndex;
         firstIndex = mem.firstIndex;
         archives = Iter.toArray(Map.entries<Principal, T.TransactionRange>(mem.archives));
-        ledgerCanister = mem.canister;
         bCleaning = archiveState.bCleaning;
         archiveProperties = archiveState.settings;
       };
@@ -584,7 +536,6 @@ module {
     /// this method is not part of the ICRC3 standard.
     public func icrc3_get_archives(request : T.GetArchivesArgs) : T.GetArchivesResult {
 
-      let ?canister_aux = mem.canister else Debug.trap("Archive controller canister must be set before call get_archives");
        
       let results = Vec.new<T.GetArchivesResultItem>();
 
@@ -596,7 +547,7 @@ module {
         Vec.add(
           results,
           {
-            canister_id = canister_aux;
+            canister_id = me_can;
             start = mem.firstIndex;
             end = mem.lastIndex;
           },
@@ -605,7 +556,7 @@ module {
         switch (request.from) {
           case (null) {}; 
           case (?val) {
-            if (canister_aux == val) {
+            if (me_can == val) {
               bFound := true;
             };
           };
@@ -662,7 +613,11 @@ module {
 
     public func icrc3_supported_block_types() : [T.BlockType] {
       return archiveState.settings.supportedBlocks;
-    }
+    };
+
+    ignore Timer.setTimer<system>(#seconds 0, upgrade_archives);
+    ignore Timer.recurringTimer<system>(#seconds 30, check_clean_up);
+    ignore Timer.recurringTimer<system>(#seconds(archiveState.settings.secsCycleMaintenance), archiveCycleMaintenance);
 
   };
 };

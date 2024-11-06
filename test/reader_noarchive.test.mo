@@ -9,7 +9,7 @@ import Balances "./ledger/reducers/balances";
 import noarchive "../src/noarchive";
 import RepIndy "mo:rep-indy-hash";
 
-actor Self {
+actor this = {
 
     let config : T.Config = {
         var TX_WINDOW  = 86400_000_000_000; 
@@ -33,7 +33,7 @@ actor Self {
         mem = dedup_mem;
     });
 
-    stable let chain_mem = noarchive.Mem();
+    stable let chain_mem = noarchive.Mem.NoArchive.V1.new();
 
     public query func compute_hash(auxm1: Trechain.Value) : async ?Blob {
         let ret = ?Blob.fromArray(RepIndy.hash_val(auxm1));
@@ -41,7 +41,7 @@ actor Self {
     };
 
     var chain = noarchive.RechainNoArchive<T.Action, T.ActionError>({ 
-        mem = chain_mem;
+        xmem = chain_mem;
         reducers = [balances.reducer];  
     });
 

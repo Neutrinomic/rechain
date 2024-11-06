@@ -14,7 +14,7 @@ import RepIndy "mo:rep-indy-hash";
 import Timer "mo:base/Timer";
 import Text "mo:base/Text";
 
-actor Self {
+actor this = {
 
     let config : T.Config = {
         var TX_WINDOW  = 86400_000_000_000;  
@@ -38,7 +38,7 @@ actor Self {
         mem = dedup_mem;
     });
 
-    stable let chain_mem = rechain.Mem();
+    stable let chain_mem = rechain.Mem.Rechain.V1.new();
 
     func encodeBlock(b: T.Action) : ?[rechain.ValueMap] {
 
@@ -151,23 +151,16 @@ actor Self {
         return chain.icrc3_get_archives(args);
     };
 
-    var chain = rechain.Chain<T.Action, T.ActionError>({ 
+    var chain = rechain.Chain<system, T.Action, T.ActionError>({ 
         settings = ?{rechain.DEFAULT_SETTINGS with supportedBlocks = []; maxActiveRecords = 20; settleToRecords = 10; maxRecordsInArchiveInstance = 30;};
-        mem = chain_mem;
+        xmem = chain_mem;
         encodeBlock = encodeBlock;
         reducers = [balances.reducer];
+        me_can = Principal.fromActor(this)
     });
 
-    ignore Timer.setTimer<system>(#seconds 0, func () : async () {
-        Debug.print("inside setTimer");
-        await chain.start_timers<system>();
-    });
 
-    public shared(msg) func set_ledger_canister(): async () {
-        chain_mem.canister := ?Principal.fromActor(Self);
-    };
-
-    public shared(msg) func add_record(x: T.Action): async (DispatchResult) {
+    public shared func add_record(x: T.Action): async (DispatchResult) {
         let ret = chain.dispatch(x);
 
         return ret;

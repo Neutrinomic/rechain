@@ -223,7 +223,6 @@ describe("Ledger", () => {
 
     expect(true).toBe(JSON.stringify(john0_to) === JSON.stringify(decodedBlock0.payload_to));
     expect(decodedBlock0.block_id).toBe(0n);
-    console.log(my_blocks.log_length, my_blocks.blocks);
     expect(my_blocks.log_length).toBe(1n);
   });
 
@@ -358,7 +357,6 @@ describe("Ledger", () => {
     let i = 0n;
     for (; i < 5; i++) {
       let r = await can.add_record(my_action);
-      console.log(i);
     }
     
     expect(i).toBe(5n);
@@ -476,7 +474,6 @@ describe("Ledger", () => {
 
     let r_transfer1 = await can.add_record(my_transfer_action1);
     let r_bal3 = await can.icrc1_balance_of(my_account2); 
-    console.log("balance of john9:",r_bal3); 
     expect(r_bal3).toBe(400n);
   });
 

@@ -3,7 +3,6 @@ import Blob "mo:base/Blob";
 import Nat "mo:base/Nat";
 import rechain  "../src";
 import Nat64 "mo:base/Nat64";
-import Timer "mo:base/Timer";
 import Vector "mo:vector";
 import Time "mo:base/Time";
 
@@ -27,7 +26,7 @@ actor class Delta({archive_controllers: [Principal]}) = this {
 
     public type ActionError = {ok:Nat; err:Text};
 
-    stable let chain_mem  = rechain.Mem();
+    stable let chain_mem  = rechain.Mem.Rechain.V1.new();
 
     func encodeBlock(b: Action): ?[rechain.ValueMap] {
         ?[
@@ -57,17 +56,14 @@ actor class Delta({archive_controllers: [Principal]}) = this {
         ];
     };
 
-    var chain = rechain.Chain<Action, ActionError>({
+    var chain = rechain.Chain<system, Action, ActionError>({
         settings = ?{rechain.DEFAULT_SETTINGS with supportedBlocks = []; maxActiveRecords = 100; settleToRecords = 30; maxRecordsInArchiveInstance = 120; archiveControllers = archive_controllers};
-        mem = chain_mem;
+        xmem = chain_mem;
         encodeBlock = encodeBlock;
         reducers = [];
+        me_can = Principal.fromActor(this);
     });
-    
-    ignore Timer.setTimer<system>(#seconds 0, func () : async () {
-        await chain.start_timers<system>();
-    });
-    
+
     public query func icrc3_get_blocks(args: rechain.GetBlocksArgs): async rechain.GetBlocksResult {
         return chain.icrc3_get_blocks(args);
     };
@@ -80,17 +76,9 @@ actor class Delta({archive_controllers: [Principal]}) = this {
         return chain.icrc3_supported_block_types();
     };
 
-    public func set_ledger_canister(): async () {
-        chain_mem.canister := ?Principal.fromActor(this);
-    };
-
-    ignore Timer.setTimer<system>(#seconds 1, func () : async () {
-        await chain.upgrade_archives();
-    });
     
     public type DispatchResult = {#Ok: rechain.BlockId; #Err: ActionError };
 
-    private func testt<system>(x:Action): DispatchResult { chain.dispatch(x) };
 
     public func dispatch(actions: [Action]): async [DispatchResult] {
         let v = Vector.new<DispatchResult>();

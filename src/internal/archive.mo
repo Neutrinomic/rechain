@@ -1,5 +1,5 @@
 import SW "mo:stable-write-only"; 
-import T "./types";   
+import T "../types";   
 import ExperimentalCycles "mo:base/ExperimentalCycles";
 import Vec "mo:vector";
 import Debug "mo:base/Debug";

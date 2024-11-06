@@ -194,7 +194,6 @@ describe("phash", () => {
     can = fixture.actor;
     canCanisterId = fixture.canisterId; 
     
-    await can.set_ledger_canister();
 
   });
 

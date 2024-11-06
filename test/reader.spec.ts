@@ -231,8 +231,6 @@ describe("reader", () => {
     can_ledger = fixture_ledger.actor;
     canCanisterId_ledger = fixture_ledger.canisterId; 
     
-    await can_ledger.set_ledger_canister();
-
     const fixture_reader = await TestReader(pic, Principal.fromText("aaaaa-aa"), canCanisterId_ledger); // canCanisterId_noarchive);
     can_reader = fixture_reader.actor;
     canCanisterId_ledger = fixture_reader.canisterId; 
@@ -263,7 +261,6 @@ describe("reader", () => {
       let r = await can_ledger.add_record(my_mint_action);
     }
    
-    await can_reader.start_timer();
 
     await passTime(5);
 
@@ -271,13 +268,11 @@ describe("reader", () => {
                                 'subaccount' : []};
     let r_balance = await can_ledger.icrc1_balance_of(my_account);
     
-    console.log("John0 balance on ledger: ", r_balance);
 
     await passTime(10);
 
     let r_balance2 = await can_reader.icrc1_balance_of(my_account);
     
-    console.log("John0 balance on reader: ", r_balance2);
 
     expect(r_balance).toBe(r_balance2);
 
@@ -309,12 +304,10 @@ describe("reader", () => {
                               'subaccount' : []};
     
     let r_balance = await can_ledger.icrc1_balance_of(account1);
-    console.log("John0 balance: ", r_balance);
     
     expect(r_balance).toBe(12500n);
 
     let r_balance2 = await can_reader.icrc1_balance_of(account1);
-    console.log("John0 balance on reader: ", r_balance2);
 
     expect(r_balance).toBe(r_balance2);
 
@@ -347,10 +340,8 @@ describe("reader", () => {
       'subaccount' : []};
 
     let r_balance = await can_ledger.icrc1_balance_of(account1);
-    console.log("John1 balance: ", r_balance);
     
     let r_balance2 = await can_reader.icrc1_balance_of(account1);
-    console.log("John1 balance on reader: ", r_balance2);
     
     expect(r_balance).toBe(r_balance2);
 

@@ -1,5 +1,4 @@
 import Principal "mo:base/Principal";
-import Error "mo:base/Error";
 import Timer "mo:base/Timer";
 import Array "mo:base/Array";
 import Nat "mo:base/Nat";
@@ -12,24 +11,24 @@ import Int "mo:base/Int";
 import T "./types";
 import List "mo:base/List";
 import Iter "mo:base/Iter";
-
+import Ver1 "./memory/reader/v1";
+import MU "mo:mosup";
 module {
+    public module Mem {
+        public module Reader {
+            public let V1 = Ver1.Reader;
+        };
+    };
+
+    let VM = Mem.Reader.V1;
+
     public type Block = T.Value;
 
-    public type Mem = {
-            var last_indexed_tx : Nat;
-        };
-
     type BlocksUnordered = {
-            start : Nat;
-            transactions : [T.Value];
-        };
+        start : Nat;
+        transactions : [T.Value];
+    };
         
-    public func Mem() : Mem {
-            return {
-                var last_indexed_tx = 0;
-            };
-        };
 
     public type nullblock = ?Block;
 
@@ -39,10 +38,11 @@ module {
         };
         let sorted_nullblocks_wid = Array.sort<{block : nullblock; id : Nat}>(blocks:[{block : nullblock; id : Nat}], my_compare);
         let sorted_nullblocks = Array.map<{block : nullblock; id : Nat}, nullblock>(sorted_nullblocks_wid, func x = x.block);
+        sorted_nullblocks;
     };
 
-    public class Reader<A>({
-        mem : Mem;
+    public class Reader<system, A>({
+        xmem : MU.MemShell<VM.Mem>;
         ledger_id : Principal;
         start_from_block: {#id:Nat; #last};
         onError : (Text) -> (); 
@@ -52,7 +52,7 @@ module {
         getTimeFromAction : A -> Nat64;   
         maxParallelRequest : Nat;
     }) {
-        var started = false; 
+        let mem = MU.access(xmem);
 
         let ledger = actor (Principal.toText(ledger_id)) : T.ICRC3Interface; 
         var lastTxTime : Nat64 = 0;
@@ -61,9 +61,8 @@ module {
         let MAX_TIME_LOCKED:Int = 120_000_000_000;
 
 
-        private func cycleNew() : async () {
+        private func cycle() : async () {
 
-            if (not started) return;
 
             let now = Time.now();
             if (now-lock < MAX_TIME_LOCKED) return
@@ -91,7 +90,6 @@ module {
                 length = maxTransactionsInCall * maxParallelRequest; 
             }]);
 
-            let quick_cycle:Bool = if (rez.log_length > mem.last_indexed_tx + 1000) true else false; 
 
             if (rez.archived_blocks.size() == 0) { 
                 
@@ -225,29 +223,8 @@ module {
             lastTxTime;
         };
 
-        private func cycle_shell() : async () {
-            if (started == true) {
-                try {
-                    let aux = await cycleNew();
-                } catch (e) {
-                    onError("cycle:" # Principal.toText(ledger_id) # ":" # Error.message(e));
-                };
-            };
 
-            if (started == true) ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
-        };
-
-        public func start_timers<system>(): async () {
-            ignore Timer.setTimer<system>(#seconds 2, cycle_shell);
-        };
-
-        public func start_timer_flag() : async () {
-           started := true;
-        };
-
-        public func stop_timer_flag() : async () {
-           started := false;
-        };
+        ignore Timer.recurringTimer<system>(#seconds 2, cycle);
     };
 
 };

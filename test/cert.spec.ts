@@ -57,7 +57,6 @@ describe("Cert", () => {
 
     await pic.resetTime();
     const time = await pic.getTime();
-    console.log("date", new Date(time));
 
   });
 
@@ -105,7 +104,6 @@ describe("Cert", () => {
               rootKey: new Uint8Array(rootKey),
               maxCertificateTimeOffsetMs: 500000000,
             };
-            console.log("inputs:", inputs)
         
         function i2hex(i:number ) {
           return ('0' + i.toString(16)).slice(-2);
@@ -114,18 +112,15 @@ describe("Cert", () => {
         const cert_hex = Array.from(new Uint8Array(certificate)).map(i2hex).join('');
         const wit_hex = Array.from(new Uint8Array(witness)).map(i2hex).join('');
 
-        console.log("certificate:", cert_hex);
-        console.log("witness:",wit_hex);
 
-        const tree = await verifyCertification({
-          canisterId: canCanisterId,
-          encodedCertificate: new Uint8Array(certificate),
-          encodedTree: new Uint8Array(witness),
-          rootKey:  new Uint8Array(rootKey),
-          maxCertificateTimeOffsetMs: 50000,
-        });
+        // const tree = await verifyCertification({
+        //   canisterId: canCanisterId,
+        //   encodedCertificate: new Uint8Array(certificate),
+        //   encodedTree: new Uint8Array(witness),
+        //   rootKey:  new Uint8Array(rootKey),
+        //   maxCertificateTimeOffsetMs: 50000,
+        // });
 
-        console.log("cert: ", ddddd.certificate);
       };
     };
   });

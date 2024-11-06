@@ -1,18 +1,17 @@
 import Array "mo:base/Array";
 import Nat "mo:base/Nat";
 import T "./types";
+import Ver1 "./memory/no_archive/v1";
+import MU "mo:mosup";
 
 module {
 
-  public type Mem = {
-    var lastIndex : Nat;
-  };
-
-  public func Mem() : Mem {
-    {
-      var lastIndex = 0;
+  public module Mem {
+    public module NoArchive {
+      public let V1 = Ver1.NoArchive;
     };
   };
+  let VM = Mem.NoArchive.V1;
 
   public type ActionReducer<A, B> = (A) -> ReducerResponse<B>;
   public type BlockId = Nat;
@@ -25,10 +24,11 @@ module {
   public type Transaction = T.Value;
   
   public class RechainNoArchive<A, E>({
-    mem : Mem;
+    xmem : MU.MemShell<VM.Mem>;
     reducers : [ActionReducer<A, E>];
   }) {
-
+    let mem = MU.access(xmem);
+    
     public func dispatch(action : A) : ({ #Ok : BlockId; #Err : E }) {
 
       let reducerResponse = Array.map<ActionReducer<A, E>, ReducerResponse<E>>(reducers, func(fn) = fn(action));

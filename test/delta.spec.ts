@@ -37,7 +37,6 @@ describe('Delta', () => {
     can = fixture.actor;
     canCanisterId = fixture.canisterId;
 
-    await can.set_ledger_canister();
 
     mgr = pic.createActor<MgrService>(MgrIdlFactory, Principal.fromText("aaaaa-aa"));
 
@@ -135,7 +134,6 @@ describe('Delta', () => {
       length: 800n
     }]);
 
-    console.log(rez.blocks[0].id);
 
     expect(rez.blocks[0].id).toBe(360n);
 

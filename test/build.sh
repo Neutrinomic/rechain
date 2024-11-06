@@ -8,7 +8,7 @@ mkdir -p ./build
 
 # Use GNU Parallel to process each *.test.mo file
 #   `NODE_OPTIONS="--no-deprecation" npx mocv bin`/moc `mops sources` --idl --hide-warnings --error-detail 0 -o "./build/${base_name}.wasm" --idl {} 1>/dev/null 2>/dev/null &&
-mocv use 0.11.3 # Only for the tests
+mocv use 0.13.2 # Only for the tests
 find . -maxdepth 1 -name '*.test.mo' | parallel '
   # Extract the base name without the directory and .test.mo extension
   base_name=$(basename {} .test.mo);

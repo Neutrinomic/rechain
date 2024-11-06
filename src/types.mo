@@ -76,7 +76,6 @@ module {
         lastIndex: Nat;
         firstIndex: Nat;
         archives: [(Principal, TransactionRange)];
-        ledgerCanister : ?Principal;
         bCleaning : Bool;
         archiveProperties: ChainSettings;
     };

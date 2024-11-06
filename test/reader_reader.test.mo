@@ -8,12 +8,11 @@ import T "./ledger/types";
 import Trechain "../src/types";
 import Balances "./ledger/reducers/balances";
 import Nat64 "mo:base/Nat64";
-import Timer "mo:base/Timer";
 import Text "mo:base/Text";
 import reader "../src/reader";
 import noarchive "../src/noarchive";
 
-actor class reader_reader(ledger_pid : Principal) = Self {
+actor class reader_reader(ledger_pid : Principal) = this {
     let config_noarchive : T.Config = {
         var TX_WINDOW  = 86400_000_000_000;  
         var PERMITTED_DRIFT = 60_000_000_000;
@@ -36,9 +35,9 @@ actor class reader_reader(ledger_pid : Principal) = Self {
         mem = dedup_mem;
     });
 
-    stable let chain_mem = noarchive.Mem();
+    stable let chain_mem = noarchive.Mem.NoArchive.V1.new();
     var chain = noarchive.RechainNoArchive<T.Action, T.ActionError>({ 
-        mem = chain_mem;
+        xmem = chain_mem;
         reducers = [balances.reducer]; 
     });
 
@@ -198,22 +197,22 @@ actor class reader_reader(ledger_pid : Principal) = Self {
         };
     };
 
-    func myOnReadNew(actions: [T.Action], id_nat : Nat): () {
+    func myOnReadNew(actions: [T.Action], _id_nat : Nat): () {
         myOnRead(actions);
     };
 
-    func onError(error_text: Text) {   
+    func onError(_error_text: Text) {   
         
     };
 
-    func onCycleEnd(total_inst: Nat64) {  
+    func onCycleEnd(_total_inst: Nat64) {  
 
     };
 
-    stable let reader_mem = reader.Mem();
+    stable let reader_mem = reader.Mem.Reader.V1.new();
 
-    var my_reader = reader.Reader<T.Action>({
-        mem = reader_mem;
+    var my_reader = reader.Reader<system, T.Action>({
+        xmem = reader_mem;
         ledger_id = ledger_pid;
         start_from_block = #id(0);
         onError = onError; 
@@ -224,16 +223,6 @@ actor class reader_reader(ledger_pid : Principal) = Self {
         maxParallelRequest = 40;
     });
 
-    ignore Timer.setTimer<system>(#seconds 0, func () : async () {
-        await my_reader.start_timers<system>();
-    });
-      
-    public func start_timer(): async () {
-         await my_reader.start_timer_flag();
-    };
-    public func stop_timer(): async () {
-         await my_reader.stop_timer_flag();
-    };
 
     public query func icrc1_balance_of(acc: ICRC.Account) : async Nat {
         balances.get(acc);
